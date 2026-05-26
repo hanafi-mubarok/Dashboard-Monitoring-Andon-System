@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import OperatorGraphicsChart from '@/components/operator/OperatorGraphicsChart';
 import { getOperatorsGraphics, getOperatorsOEE } from '@/lib/queries/operator';
 import { Users } from 'lucide-react';
+export const dynamic = 'force-dynamic';
 
 const formatNumber = (num: number | null | undefined): string => {
   if (num == null || !Number.isFinite(num)) return '—';

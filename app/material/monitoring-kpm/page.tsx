@@ -6,6 +6,7 @@ import MaterialOutLineChart from "@/components/material/MaterialOutLineChart";
 import {
   getMonitoringKpmFilterOptions,
   getMonitoringKpmRows,
+  getMonitoringKpmCount,
   type MonitoringKpmSortBy,
   type SortDirection,
   getMaterialOutLineChart,
@@ -53,6 +54,8 @@ function buildSortHref(
   currentSortDir: SortDirection
 ) {
   const updated = new URLSearchParams(params.toString());
+  // reset to first page when sorting
+  updated.delete("page");
   const isSameColumn = currentSortBy === nextSortBy;
   const nextDir: SortDirection =
     isSameColumn && currentSortDir === "asc" ? "desc" : "asc";
@@ -84,7 +87,11 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
   const requestedSortDir = getQueryValue(resolvedSearchParams.sortDir);
   const sortDir: SortDirection = requestedSortDir === "asc" ? "asc" : "desc";
 
+  const requestedPage = parseInt(getQueryValue(resolvedSearchParams.page) || "1", 10);
+  const page = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage;
+
   const [rows, filterOptions, materialOutLineChart, availableMonths] = await Promise.all([
+    // rows with pagination: limit 100
     getMonitoringKpmRows({
       st,
       postDate,
@@ -92,12 +99,42 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
       search,
       sortBy,
       sortDir,
-      limit: 300,
+      limit: 100,
+      offset: (page - 1) * 100,
     }),
     getMonitoringKpmFilterOptions(),
     getMaterialOutLineChart(selectedMonth),
     getAvailableMonths(),
   ]);
+
+  const totalRows = await getMonitoringKpmCount({
+    st,
+    postDate,
+    proyek,
+    search,
+    sortBy,
+    sortDir,
+  });
+  const rowsPerPage = 100;
+  const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+  const pageStart = rows.length === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+  const pageEnd = Math.min(page * rowsPerPage, totalRows);
+
+  const paginationPages = (() => {
+    const maxButtons = 5;
+
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const halfWindow = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, page - halfWindow);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    startPage = Math.max(1, endPage - maxButtons + 1);
+
+    return Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index);
+  })();
 
   const baseParams = new URLSearchParams();
   if (selectedMonth) baseParams.set("month", selectedMonth);
@@ -105,6 +142,9 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
   if (postDate) baseParams.set("post_date", postDate);
   if (proyek) baseParams.set("proyek", proyek);
   if (search) baseParams.set("search", search);
+  if (sortBy) baseParams.set("sortBy", sortBy);
+  if (sortDir) baseParams.set("sortDir", sortDir);
+  // baseParams represents current filters (page will be set per-link)
 
   return (
     <ModernSidebar>
@@ -223,6 +263,46 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
                 )}
               </tbody>
             </table>
+            <div className="flex flex-col gap-3 rounded-md border-t border-gray-800 bg-gray-900/40 px-4 py-3 text-sm text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`?${new URLSearchParams({ ...Object.fromEntries(baseParams), page: String(Math.max(1, page - 1)) }).toString()}`}
+                  className={`rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700 ${page <= 1 ? 'pointer-events-none opacity-50' : ''}`}
+                >
+                  Sebelumnya
+                </Link>
+
+                {paginationPages.map((pageNumber) => {
+                  const pageParams = new URLSearchParams(baseParams.toString());
+                  pageParams.set('page', String(pageNumber));
+
+                  return (
+                    <Link
+                      key={pageNumber}
+                      href={`?${pageParams.toString()}`}
+                      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        pageNumber === page
+                          ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
+                          : 'border-gray-600 text-gray-200 hover:bg-gray-700'
+                      }`}
+                    >
+                      {pageNumber}
+                    </Link>
+                  );
+                })}
+
+                <Link
+                  href={`?${new URLSearchParams({ ...Object.fromEntries(baseParams), page: String(Math.min(totalPages, page + 1)) }).toString()}`}
+                  className={`rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700 ${page >= totalPages ? 'pointer-events-none opacity-50' : ''}`}
+                >
+                  Berikutnya
+                </Link>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

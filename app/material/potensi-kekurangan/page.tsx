@@ -19,6 +19,8 @@ import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+const PAGE_SIZE = 100;
+
 interface PotensiKekuranganMaterial {
   id: string;
   trainset: number;
@@ -143,6 +145,7 @@ export default function PotensiKekuranganMaterialPage() {
   const [chartRows, setChartRows] = useState<KekuranganMaterialChartRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortCriteria, setSortCriteria] = useState<SortCriterion[]>([
     { key: 'status_material', direction: 'asc' },
     { key: 'kebutuhan_incremental', direction: 'asc' },
@@ -347,6 +350,10 @@ export default function PotensiKekuranganMaterialPage() {
     return result;
   }, [allData, searchKomat, filterProductName, filterStatus, filterTrainset]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKomat, filterProductName, filterStatus, filterTrainset]);
+
   const chartData = useMemo<ChartData<'bar', Array<number | null>, string>>(() => {
     const visiblePairs = new Set(
       filteredData
@@ -423,6 +430,35 @@ export default function PotensiKekuranganMaterialPage() {
     });
   }, [filteredData, sortCriteria]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return sortedData.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [sortedData, currentPage]);
+
+  const paginationPages = useMemo(() => {
+    const maxButtons = 5;
+
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const halfWindow = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    startPage = Math.max(1, endPage - maxButtons + 1);
+
+    return Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index);
+  }, [currentPage, totalPages]);
+
   const handleSort = (key: SortKey, isMultiSort: boolean) => {
     setSortByKey(key, isMultiSort);
   };
@@ -447,6 +483,8 @@ export default function PotensiKekuranganMaterialPage() {
   // Calculate statistics
   const kritisCount = filteredData.filter(d => d.status_material === 'Potensi Kurang').length;
   const amanCount = filteredData.filter(d => d.status_material === 'Aman').length;
+  const pageStart = filteredData.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredData.length);
 
   if (loading) {
     return (
@@ -630,105 +668,148 @@ export default function PotensiKekuranganMaterialPage() {
                 <p className="text-gray-400">Tidak ada data material yang sesuai filter</p>
               </div>
             ) : (
-              <div className="max-h-[85vh] overflow-auto rounded-md border border-gray-700/40">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('trainset')} className="inline-flex items-center gap-1">
-                          Trainset {getSortIndicator('trainset')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('product_name')} className="inline-flex items-center gap-1">
-                          Produk {getSortIndicator('product_name')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('komat')} className="inline-flex items-center gap-1">
-                          Komat {getSortIndicator('komat')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('spesifikasi')} className="inline-flex items-center gap-1">
-                          Spesifikasi {getSortIndicator('spesifikasi')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('jumlah_diminta')} className="inline-flex items-center gap-1 ml-auto">
-                          Qty Material Diminta {getSortIndicator('jumlah_diminta')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('jumlah_tiapts')} className="inline-flex items-center gap-1 ml-auto">
-                          Qty Produk {getSortIndicator('jumlah_tiapts')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('kebutuhan_produk')} className="inline-flex items-center gap-1 ml-auto">
-                          Qty Material 1 TS {getSortIndicator('kebutuhan_produk')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('kebutuhan_incremental')} className="inline-flex items-center gap-1 ml-auto">
-                          Qty Kebutuhan Material {getSortIndicator('kebutuhan_incremental')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('stok_ppc')} className="inline-flex items-center gap-1 ml-auto">
-                          Stok PPC {getSortIndicator('stok_ppc')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('stok_warehouse')} className="inline-flex items-center gap-1 ml-auto">
-                          Stok WH {getSortIndicator('stok_warehouse')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('total_stok')} className="inline-flex items-center gap-1 ml-auto">
-                          Total Stok {getSortIndicator('total_stok')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('jumlah_kekurangan')} className="inline-flex items-center gap-1 ml-auto">
-                          Jumlah Kekurangan {getSortIndicator('jumlah_kekurangan')}
-                        </button>
-                      </th>
-                      <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-center p-2 text-gray-300 font-semibold">
-                        <button type="button" onClick={createSortHandler('status_material')} className="inline-flex items-center gap-1 justify-center mx-auto">
-                          Status {getSortIndicator('status_material')}
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedData.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
-                      >
-                        <td className="p-2 text-gray-200 font-mono">{item.trainset}</td>
-                        <td className="p-2 text-gray-200">{item.product_name}</td>
-                        <td className="p-2 text-gray-200 font-mono">{item.komat}</td>
-                        <td className="p-2 text-gray-200">{item.spesifikasi}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_diminta, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_tiapts, '')}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.kebutuhan_produk, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center font-semibold">{renderCenteredQuantity(item.kebutuhan_incremental, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.stok_ppc, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.stok_warehouse, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.total_stok, item.satuan)}</td>
-                        <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_kekurangan, item.satuan, '-')}</td>
-                        <td className="p-2 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(item.status_material)}`}>
-                            {getStatusIcon(item.status_material)}
-                            {item.status_material}
-                          </span>
-                        </td>
+              <div className="space-y-3">
+                <div className="max-h-[85vh] overflow-auto rounded-md border border-gray-700/40">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('trainset')} className="inline-flex items-center gap-1">
+                            Trainset {getSortIndicator('trainset')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('product_name')} className="inline-flex items-center gap-1">
+                            Produk {getSortIndicator('product_name')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('komat')} className="inline-flex items-center gap-1">
+                            Komat {getSortIndicator('komat')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-left p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('spesifikasi')} className="inline-flex items-center gap-1">
+                            Spesifikasi {getSortIndicator('spesifikasi')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('jumlah_diminta')} className="inline-flex items-center gap-1 ml-auto">
+                            Qty Material Diminta {getSortIndicator('jumlah_diminta')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('jumlah_tiapts')} className="inline-flex items-center gap-1 ml-auto">
+                            Qty Produk {getSortIndicator('jumlah_tiapts')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('kebutuhan_produk')} className="inline-flex items-center gap-1 ml-auto">
+                            Qty Material 1 TS {getSortIndicator('kebutuhan_produk')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('kebutuhan_incremental')} className="inline-flex items-center gap-1 ml-auto">
+                            Qty Kebutuhan Material {getSortIndicator('kebutuhan_incremental')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('stok_ppc')} className="inline-flex items-center gap-1 ml-auto">
+                            Stok PPC {getSortIndicator('stok_ppc')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('stok_warehouse')} className="inline-flex items-center gap-1 ml-auto">
+                            Stok WH {getSortIndicator('stok_warehouse')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('total_stok')} className="inline-flex items-center gap-1 ml-auto">
+                            Total Stok {getSortIndicator('total_stok')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-right p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('jumlah_kekurangan')} className="inline-flex items-center gap-1 ml-auto">
+                            Jumlah Kekurangan {getSortIndicator('jumlah_kekurangan')}
+                          </button>
+                        </th>
+                        <th className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur text-center p-2 text-gray-300 font-semibold">
+                          <button type="button" onClick={createSortHandler('status_material')} className="inline-flex items-center gap-1 justify-center mx-auto">
+                            Status {getSortIndicator('status_material')}
+                          </button>
+                        </th>
                       </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedData.map((item) => (
+                        <tr
+                          key={item.id}
+                          className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
+                        >
+                          <td className="p-2 text-gray-200 font-mono">{item.trainset}</td>
+                          <td className="p-2 text-gray-200">{item.product_name}</td>
+                          <td className="p-2 text-gray-200 font-mono">{item.komat}</td>
+                          <td className="p-2 text-gray-200">{item.spesifikasi}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_diminta, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_tiapts, '')}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.kebutuhan_produk, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center font-semibold">{renderCenteredQuantity(item.kebutuhan_incremental, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.stok_ppc, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.stok_warehouse, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.total_stok, item.satuan)}</td>
+                          <td className="p-2 text-gray-200 text-center">{renderCenteredQuantity(item.jumlah_kekurangan, item.satuan, '-')}</td>
+                          <td className="p-2 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(item.status_material)}`}>
+                              {getStatusIcon(item.status_material)}
+                              {item.status_material}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-md border border-gray-700/40 bg-gray-900/40 px-4 py-3 text-sm text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    Menampilkan {pageStart}-{pageEnd} dari {filteredData.length} data
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={currentPage === 1}
+                      className="rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Sebelumnya
+                    </button>
+
+                    {paginationPages.map((page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          page === currentPage
+                            ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
+                            : 'border-gray-600 text-gray-200 hover:bg-gray-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
                     ))}
-                  </tbody>
-                </table>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={currentPage === totalPages}
+                      className="rounded-md border border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

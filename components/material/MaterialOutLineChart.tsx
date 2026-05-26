@@ -47,7 +47,7 @@ export default function MaterialOutLineChart({ data, monthLabel }: MaterialOutLi
       labels: data.map((item) => formatDateLabel(item.tanggal)),
       datasets: [
         {
-          label: 'Baris Reservasi',
+          label: 'Item Direservasi',
           data: data.map((item) => Number(item.baris_reservasi ?? 0)),
           borderColor: '#06B6D4',
           backgroundColor: 'rgba(6, 182, 212, 0.15)',
@@ -60,7 +60,7 @@ export default function MaterialOutLineChart({ data, monthLabel }: MaterialOutLi
           yAxisID: 'yBaris',
         },
         {
-          label: 'Baris Disiapkan',
+          label: 'Item Disiapkan',
           data: data.map((item) => Number(item.baris_disiapkan ?? 0)),
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -73,7 +73,7 @@ export default function MaterialOutLineChart({ data, monthLabel }: MaterialOutLi
           yAxisID: 'yBaris',
         },
         {
-          label: 'Baris Out',
+          label: 'Item Keluar',
           data: data.map((item) => Number(item.baris_out ?? 0)),
           borderColor: '#F59E0B',
           backgroundColor: 'rgba(245, 158, 11, 0.15)',
@@ -86,7 +86,7 @@ export default function MaterialOutLineChart({ data, monthLabel }: MaterialOutLi
           yAxisID: 'yBaris',
         },
         {
-          label: 'Jumlah Reservasi',
+          label: 'Qty Item Direservasi',
           data: data.map((item) => Number(item.jumlah_reservasi ?? 0)),
           borderColor: '#F97316',
           backgroundColor: 'rgba(249, 115, 22, 0.15)',
@@ -99,7 +99,7 @@ export default function MaterialOutLineChart({ data, monthLabel }: MaterialOutLi
           yAxisID: 'yQty',
         },
         {
-          label: 'Jumlah Disiapkan',
+          label: 'Qty Item Disiapkan',
           data: data.map((item) => Number(item.jumlah_disiapkan ?? 0)),
           borderColor: '#A855F7',
           backgroundColor: 'rgba(168, 85, 247, 0.15)',

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type MonitoringKpmFiltersProps = {
   stOptions: string[];
@@ -32,7 +32,7 @@ export default function MonitoringKpmFilters({
 }: MonitoringKpmFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const debounceTimerRef = useRef<number | null>(null);
 
   const [st, setSt] = useState(currentSt);
   const [postDate, setPostDate] = useState(currentPostDate);
@@ -66,29 +66,62 @@ export default function MonitoringKpmFilters({
     });
   }, [availableMonths]);
 
-  const nextQueryString = useMemo(() => {
+  const buildQueryString = useMemo(() => {
+    return (nextValues: {
+      month: string;
+      st: string;
+      postDate: string;
+      search: string;
+      proyek: string;
+    }) => {
     const params = new URLSearchParams();
-    if (month) params.set('month', month);
-    if (st) params.set("st", st);
-    if (postDate) params.set("post_date", postDate);
-    if (search) params.set("search", search);
-    if (proyek) params.set("proyek", proyek);
-    if (sortBy) params.set("sortBy", sortBy);
-    if (sortDir) params.set("sortDir", sortDir);
-    return params.toString();
-  }, [month, st, postDate, search, proyek, sortBy, sortDir]);
+      if (nextValues.month) params.set('month', nextValues.month);
+      if (nextValues.st) params.set("st", nextValues.st);
+      if (nextValues.postDate) params.set("post_date", nextValues.postDate);
+      if (nextValues.search) params.set("search", nextValues.search);
+      if (nextValues.proyek) params.set("proyek", nextValues.proyek);
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortDir) params.set('sortDir', sortDir);
+      params.set('page', '1');
+      return params.toString();
+    };
+  }, [sortBy, sortDir]);
+
+  const updateUrl = useMemo(() => {
+    return (nextValues: {
+      month: string;
+      st: string;
+      postDate: string;
+      search: string;
+      proyek: string;
+      debounce?: boolean;
+    }) => {
+      const nextQueryString = buildQueryString(nextValues);
+      const nextUrl = nextQueryString ? `${pathname}?${nextQueryString}` : pathname;
+
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
+      if (nextValues.debounce) {
+        debounceTimerRef.current = window.setTimeout(() => {
+          router.replace(nextUrl, { scroll: false });
+        }, 350);
+        return;
+      }
+
+      router.replace(nextUrl, { scroll: false });
+    };
+  }, [buildQueryString, pathname, router]);
 
   useEffect(() => {
-    const currentQueryString = searchParams.toString();
-    if (currentQueryString === nextQueryString) return;
-
-    const timeoutId = window.setTimeout(() => {
-      const nextUrl = nextQueryString ? `${pathname}?${nextQueryString}` : pathname;
-      router.replace(nextUrl, { scroll: false });
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [nextQueryString, pathname, router, searchParams]);
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleReset = () => {
     setMonth(defaultMonth);
@@ -104,7 +137,11 @@ export default function MonitoringKpmFilters({
         <label className="text-xs text-gray-400">Bulan</label>
         <select
           value={month}
-          onChange={(e) => setMonth(e.target.value)}
+          onChange={(e) => {
+            const nextMonth = e.target.value;
+            setMonth(nextMonth);
+            updateUrl({ month: nextMonth, st, postDate, search, proyek });
+          }}
           className="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white"
         >
           {monthOptions.map((option) => (
@@ -119,7 +156,11 @@ export default function MonitoringKpmFilters({
         <label className="text-xs text-gray-400">ST</label>
         <select
           value={st}
-          onChange={(e) => setSt(e.target.value)}
+          onChange={(e) => {
+            const nextSt = e.target.value;
+            setSt(nextSt);
+            updateUrl({ month, st: nextSt, postDate, search, proyek });
+          }}
           className="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white"
         >
           <option value="">Semua ST</option>
@@ -136,7 +177,11 @@ export default function MonitoringKpmFilters({
         <input
           type="date"
           value={postDate}
-          onChange={(e) => setPostDate(e.target.value)}
+          onChange={(e) => {
+            const nextPostDate = e.target.value;
+            setPostDate(nextPostDate);
+            updateUrl({ month, st, postDate: nextPostDate, search, proyek });
+          }}
           className="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white cursor-pointer"
         />
       </div>
@@ -146,7 +191,11 @@ export default function MonitoringKpmFilters({
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            const nextSearch = e.target.value;
+            setSearch(nextSearch);
+            updateUrl({ month, st, postDate, search: nextSearch, proyek, debounce: true });
+          }}
           placeholder="Ketik kata kunci..."
           className="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white"
         />
@@ -156,7 +205,11 @@ export default function MonitoringKpmFilters({
         <label className="text-xs text-gray-400">Proyek</label>
         <select
           value={proyek}
-          onChange={(e) => setProyek(e.target.value)}
+          onChange={(e) => {
+            const nextProyek = e.target.value;
+            setProyek(nextProyek);
+            updateUrl({ month, st, postDate, search, proyek: nextProyek });
+          }}
           className="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-sm text-white"
         >
           <option value="">Semua Proyek</option>
@@ -171,7 +224,14 @@ export default function MonitoringKpmFilters({
       <div className="xl:col-span-5 flex gap-2">
         <button
           type="button"
-          onClick={handleReset}
+          onClick={() => {
+            setMonth(defaultMonth);
+            setSt("");
+            setPostDate("");
+            setSearch("");
+            setProyek("");
+            updateUrl({ month: defaultMonth, st: "", postDate: "", search: "", proyek: "" });
+          }}
           className="rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-600 transition-colors"
         >
           Reset Filter

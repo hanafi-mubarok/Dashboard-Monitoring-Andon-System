@@ -5,6 +5,7 @@ import ModernSidebar from '@/components/ui/sidebar';
 import ProductTrainsetChartLantai2 from '@/components/product/ProductTrainsetChartLantai2';
 import ProductSummaryListLantai2 from '@/components/product/ProductSummaryListLantai2';
 import type { ProductPercentageLantai2 } from '@/lib/queries/production-progress-protrack';
+export const dynamic = 'force-dynamic';
 
 export default function PengerjaanLantai2Page() {
   const [data, setData] = useState<ProductPercentageLantai2[]>([]);

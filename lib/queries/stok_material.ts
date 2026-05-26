@@ -66,6 +66,7 @@ export interface MonitoringKpmFilters {
   sortBy?: MonitoringKpmSortBy;
   sortDir?: SortDirection;
   limit?: number;
+  offset?: number;
 }
 
 export interface MonitoringKpmFilterOptions {
@@ -234,6 +235,7 @@ export async function getMonitoringKpmRows(
     const sortBy = buildOrderBy(filters.sortBy);
     const sortDir = buildSortDir(filters.sortDir);
     const safeLimit = Math.max(1, Math.min(500, Number(filters.limit) || 200));
+    const safeOffset = Math.max(0, Number(filters.offset) || 0);
 
     const result = await db.execute(sql`
       SELECT
@@ -259,6 +261,7 @@ export async function getMonitoringKpmRows(
       ${whereSql}
       ORDER BY ${sortBy} ${sortDir}, no DESC
       LIMIT ${safeLimit}
+      OFFSET ${safeOffset}
     `);
 
     const rows = Array.isArray(result[0]) ? result[0] : result;
@@ -677,5 +680,63 @@ ORDER BY
   } catch (error) {
     console.error('Gagal mengambil timeline stok material:', error);
     return [];
+  }
+}
+
+export async function getMonitoringKpmCount(filters: MonitoringKpmFilters): Promise<number> {
+  try {
+    const whereClauses: SQL[] = [];
+
+    const st = (filters.st ?? '').trim();
+    const postDate = (filters.postDate ?? '').trim();
+    const proyek = (filters.proyek ?? '').trim();
+    const status = (filters.status ?? '').trim();
+    const search = (filters.search ?? '').trim();
+
+    if (st) {
+      whereClauses.push(sql`st = ${st}`);
+    }
+
+    if (postDate) {
+      whereClauses.push(sql`DATE(post_date) = ${postDate}`);
+    }
+
+    if (proyek) {
+      whereClauses.push(sql`proyek = ${proyek}`);
+    }
+
+    if (status) {
+      whereClauses.push(sql`status = ${status}`);
+    }
+
+    if (search) {
+      const keyword = `%${search}%`;
+      whereClauses.push(sql`
+        (
+          no_kpm LIKE ${keyword}
+          OR CAST(item AS CHAR) LIKE ${keyword}
+          OR komat LIKE ${keyword}
+          OR spesifikasi LIKE ${keyword}
+        )
+      `);
+    }
+
+    const whereSql =
+      whereClauses.length > 0
+        ? sql`WHERE ${sql.join(whereClauses, sql` AND `)}`
+        : sql``;
+
+    const result = await db.execute(sql`
+      SELECT COUNT(*) AS total
+      FROM stok_material
+      ${whereSql}
+    `);
+
+    const rows = Array.isArray(result[0]) ? result[0] : result;
+    const total = (rows as Array<{ total: number }>)[0]?.total;
+    return Number(total) || 0;
+  } catch (error) {
+    console.error('Gagal menghitung data monitoring KPM:', error);
+    return 0;
   }
 }
