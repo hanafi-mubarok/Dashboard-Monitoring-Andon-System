@@ -45,7 +45,10 @@ export interface MonitoringKpmRow {
   tgl_ready: string | null;
   qty_ready: number | null;
   status_komponen: string | null;
+  harga_satuan: number;
+  total_harga: number;
 }
+
 
 export type MonitoringKpmSortBy =
   | 'no'
@@ -119,6 +122,15 @@ export interface KekuranganMaterialChartRow {
   product_name: string | null;
   jumlah_material_kurang: number | null;
 }
+
+export interface MaterialOutDoughnutChart {
+  proyek: string | null;
+  total_qty: number | null;
+  percentage_qty: number | null;
+  total_harga: number | null;
+  percentage_harga: number | null;
+};
+
 
 
 
@@ -199,33 +211,33 @@ export async function getMonitoringKpmRows(
     const status = (filters.status ?? '').trim();
     const search = (filters.search ?? '').trim();
 
-    if (st) {
-      whereClauses.push(sql`st = ${st}`);
-    }
+if (st) {
+  whereClauses.push(sql`sm.st = ${st}`);
+}
 
-    if (postDate) {
-      whereClauses.push(sql`DATE(post_date) = ${postDate}`);
-    }
+if (postDate) {
+  whereClauses.push(sql`DATE(sm.post_date) = ${postDate}`);
+}
 
-    if (proyek) {
-      whereClauses.push(sql`proyek = ${proyek}`);
-    }
+if (proyek) {
+  whereClauses.push(sql`sm.proyek = ${proyek}`);
+}
 
-    if (status) {
-      whereClauses.push(sql`status = ${status}`);
-    }
+if (status) {
+  whereClauses.push(sql`sm.status = ${status}`);
+}
 
-    if (search) {
-      const keyword = `%${search}%`;
-      whereClauses.push(sql`
-        (
-          no_kpm LIKE ${keyword}
-          OR CAST(item AS CHAR) LIKE ${keyword}
-          OR komat LIKE ${keyword}
-          OR spesifikasi LIKE ${keyword}
-        )
-      `);
-    }
+if (search) {
+  const keyword = `%${search}%`;
+  whereClauses.push(sql`
+    (
+      sm.no_kpm LIKE ${keyword}
+      OR CAST(sm.item AS CHAR) LIKE ${keyword}
+      OR sm.komat LIKE ${keyword}
+      OR sm.spesifikasi LIKE ${keyword}
+    )
+  `);
+}
 
     const whereSql =
       whereClauses.length > 0
@@ -237,32 +249,39 @@ export async function getMonitoringKpmRows(
     const safeLimit = Math.max(1, Math.min(500, Number(filters.limit) || 200));
     const safeOffset = Math.max(0, Number(filters.offset) || 0);
 
-    const result = await db.execute(sql`
-      SELECT
-        no,
-        st,
-        post_date,
-        no_kpm,
-        item,
-        komat,
-        spesifikasi,
-        proyek,
-        typecar,
-        ts,
-        qty,
-        uom,
-        sn,
-        pic,
-        status,
-        tgl_ready,
-        qty_ready,
-        status_komponen
-      FROM stok_material
-      ${whereSql}
-      ORDER BY ${sortBy} ${sortDir}, no DESC
-      LIMIT ${safeLimit}
-      OFFSET ${safeOffset}
-    `);
+const result = await db.execute(sql`
+  SELECT
+    sm.no,
+    sm.st,
+    sm.post_date,
+    sm.no_kpm,
+    sm.item,
+    sm.komat,
+    sm.spesifikasi,
+    sm.proyek,
+    sm.typecar,
+    sm.ts,
+    sm.qty,
+    sm.uom,
+    sm.sn,
+    sm.pic,
+    sm.status,
+    sm.tgl_ready,
+    sm.qty_ready,
+    sm.status_komponen,
+
+    COALESCE(mk.harga_satuan, 0) AS harga_satuan,
+    (sm.qty * COALESCE(mk.harga_satuan, 0)) AS total_harga
+
+  FROM stok_material sm
+  LEFT JOIN master_komat mk
+    ON sm.komat = mk.komat
+
+  ${whereSql}
+  ORDER BY ${sortBy} ${sortDir}, sm.no DESC
+  LIMIT ${safeLimit}
+  OFFSET ${safeOffset}
+`);
 
     const rows = Array.isArray(result[0]) ? result[0] : result;
     return rows as MonitoringKpmRow[];
@@ -738,5 +757,44 @@ export async function getMonitoringKpmCount(filters: MonitoringKpmFilters): Prom
   } catch (error) {
     console.error('Gagal menghitung data monitoring KPM:', error);
     return 0;
+  }
+}
+
+export async function getMaterialOutDoughnutChart(
+  month?: string,
+): Promise<MaterialOutDoughnutChart[]> {
+  try {
+    const selectedMonth = isMonthValue((month ?? '').trim())
+      ? (month ?? '').trim()
+      : getCurrentMonthValue();
+
+    const result = await db.execute(sql`
+SELECT 
+    sm.proyek,
+    SUM(sm.qty) AS total_qty,
+    ROUND(
+        SUM(sm.qty) * 100.0
+        / SUM(SUM(sm.qty)) OVER ()
+    ) AS percentage_qty,
+    
+    SUM(sm.qty * COALESCE(mk.harga_satuan, 0)) AS total_harga,
+    ROUND(
+        SUM(sm.qty * COALESCE(mk.harga_satuan, 0)) * 100.0
+        / SUM(SUM(sm.qty * COALESCE(mk.harga_satuan, 0))) OVER ()
+    ) AS percentage_harga
+FROM stok_material sm
+LEFT JOIN master_komat mk
+    ON sm.komat = mk.komat
+WHERE sm.post_date IS NOT NULL
+  AND DATE_FORMAT(sm.post_date, '%Y-%m') = ${selectedMonth}
+GROUP BY sm.proyek
+ORDER BY percentage_qty DESC;
+    `);
+
+    const rows = Array.isArray(result[0]) ? result[0] : result;
+    return rows as MaterialOutDoughnutChart[];
+  } catch (error) {
+    console.error('Gagal mengambil doughnut chart stok material:', error);
+    return [];
   }
 }

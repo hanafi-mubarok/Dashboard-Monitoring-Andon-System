@@ -11,6 +11,7 @@ import {
   Users, 
   FileText,
   Package,
+  ClipboardList,
   Search,
   LogOut,
   HelpCircle,
@@ -243,13 +244,19 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
     if (pathname.startsWith('/penugasan-operator')) return 'operator-assignment';
     if (pathname.startsWith('/schedule/lantai-1')) return 'schedule-lantai1';
     if (pathname.startsWith('/schedule/lantai-2')) return 'schedule-lantai2';
+    if (pathname.startsWith('/schedule/sukosari')) return 'schedule-sukosari';
     if (pathname.startsWith('/schedule')) return 'schedule-lantai3';
     if (pathname.startsWith('/product/lantai-1')) return 'product-pengerjaan-lantai1';
     if (pathname.startsWith('/product/lantai-2')) return 'product-pengerjaan-lantai2';
+    if (pathname.startsWith('/product/sukosari')) return 'product-pengerjaan-sukosari';
     if (pathname === '/product' || pathname.startsWith('/product/')) return 'product-pengerjaan-lantai3';
     if (pathname.startsWith('/product-tracking')) return 'product-tracking';
+    if (pathname.startsWith('/project/tambah-project')) return 'project-tambah-project';
+    if (pathname.startsWith('/project/value-stream-mapping')) return 'project-value-stream-mapping';
+    if (pathname.startsWith('/project')) return 'project-tambah-project';
     if (pathname.startsWith('/production-progress/lantai-1')) return 'production-lantai1';
     if (pathname.startsWith('/production-progress/lantai-2')) return 'production-lantai2';
+    if (pathname.startsWith('/production-progress/sukosari')) return 'production-sukosari';
     if (pathname.startsWith('/production-progress')) return 'production-workstation';
     if (pathname.startsWith('/production/logs')) return 'production-log';
     if (pathname.startsWith('/settings')) return 'settings';
@@ -347,6 +354,11 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           id: 'schedule-lantai1',
           label: 'Lantai 1 Candisewu',
           path: '/schedule/lantai-1'
+        },
+        {
+          id: 'schedule-sukosari',
+          label: 'Workshop Sukosari',
+          path: '/schedule/sukosari'
         }
       ]
     },
@@ -375,7 +387,31 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           id: 'product-pengerjaan-lantai1',
           label: 'Pengerjaan Lantai 1',
           path: '/product/lantai-1'
+        },
+        {
+              id: 'product-pengerjaan-sukosari',
+              label: 'Workshop Sukosari',
+              path: '/product/sukosari'
         }
+      ]
+    },
+    {
+      id: 'project',
+      label: 'Project',
+      icon: ClipboardList,
+      submenu: [
+        {
+          id: 'project-tambah-project',
+          label: 'Tambahkan Project',
+          path: '/project/tambah-project'
+        },
+        /*
+        {
+          id: 'project-value-stream-mapping',
+          label: 'Value Stream Mapping',
+          path: '/project/value-stream-mapping'
+        }
+          */
       ]
     },
     {
@@ -398,6 +434,11 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           label: 'Lantai 1 Candisewu',
           path: '/production-progress/lantai-1'
         },
+            {
+              id: 'production-sukosari',
+              label: 'Workshop Sukosari',
+              path: '/production-progress/sukosari'
+            },
       ]
     }
   ];
@@ -422,7 +463,9 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           )}
         </div>
 
+
         {/* Search Bar */}
+        {/*}
         {isOpen && (
           <div className="p-4">
             <div className="relative">
@@ -435,6 +478,7 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
             </div>
           </div>
         )}
+          */}
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
@@ -454,7 +498,9 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
               toggleSubmenu={toggleSubmenu}
             />
           ))}
+        </nav>
 
+{/*
           {isOpen && (
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-3 px-3">
               System
@@ -469,7 +515,7 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
             toggleSubmenu={toggleSubmenu}
           />
         </nav>
-
+*/}
         {/* Footer */}
         <div className="p-4 border-t border-gray-800/50">
           {isOpen ? (

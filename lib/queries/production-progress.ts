@@ -558,6 +558,43 @@ export interface ProductStatsByTrainset {
   presentase_kekurangan_komponen: number | null;
 }
 
+// Get distinct projects ordered by most recently started record (newest first)
+export async function getDistinctProjects(): Promise<string[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT project_name
+      FROM production_progress
+      WHERE project_name IS NOT NULL AND TRIM(project_name) <> ''
+      GROUP BY project_name
+      ORDER BY MAX(start_actual) DESC
+    `);
+
+    const rows = extractRows(result);
+    return rows.map((r: any) => String(r.project_name));
+  } catch (error) {
+    console.error('Failed to fetch distinct projects:', error);
+    return [];
+  }
+}
+
+// Get distinct trainsets for a given project
+export async function getDistinctTrainsetsByProject(projectName: string): Promise<string[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT DISTINCT trainset
+      FROM production_progress
+      WHERE project_name = ${projectName}
+      ORDER BY trainset DESC
+    `);
+
+    const rows = extractRows(result);
+    return rows.map((r: any) => String(r.trainset));
+  } catch (error) {
+    console.error('Failed to fetch trainsets for project:', projectName, error);
+    return [];
+  }
+}
+
 export interface AbnormalProgress {
   operator_actual_rfid: number | null;
   operator_actual_name: string | null;
@@ -1166,50 +1203,47 @@ ORDER BY
 
     const result = await db.execute(sql`
 SELECT 
-    j.id_product, 
-    j.product_name, 
-    j.trainset, 
+    j.id_product,
+    j.product_name,
+    j.trainset,
     j.total_personil,
     j.proses_produk,
     j.jumlah_tiapts AS total,
-    j.tanggal_mulai, 
+    j.tanggal_mulai,
     j.tanggal_selesai,
     COALESCE(p.jumlah_tunggu_qc, 0) AS jumlah_tunggu_qc,
     COALESCE(p.jumlah_finish_good, 0) AS jumlah_finish_good,
     0 AS percentage
 FROM 
-    jadwal AS j 
+    jadwal AS j
 LEFT JOIN 
     (
-        SELECT 
-            id_product, 
+        SELECT
+            id_product,
             trainset,
 
-            -- ✅ DISTINCT per id_perproduct
-            COUNT(DISTINCT CASE 
-                WHEN status = 'Tunggu QC' 
-                THEN id_perproduct 
+            COUNT(DISTINCT CASE
+                WHEN status = 'Tunggu QC'
+                THEN id_perproduct
             END) AS jumlah_tunggu_qc,
 
-            COUNT(DISTINCT CASE 
-                WHEN status = 'Finish Good' 
-                THEN id_perproduct 
+            COUNT(DISTINCT CASE
+                WHEN status = 'Finish Good'
+                THEN id_perproduct
             END) AS jumlah_finish_good
 
         FROM ${progressTable}
-        WHERE 
-            MONTH(start_actual) = MONTH(CURRENT_DATE()) 
-            AND YEAR(start_actual) = YEAR(CURRENT_DATE())
-        GROUP BY 
-            id_product, trainset
-    ) p 
+        GROUP BY
+            id_product,
+            trainset
+    ) p
     ON j.id_product = p.id_product
-    AND j.trainset = p.trainset
-WHERE 
-    MONTH(j.tanggal_mulai) = MONTH(CURRENT_DATE()) 
+   AND j.trainset = p.trainset
+WHERE
+    MONTH(j.tanggal_mulai) = MONTH(CURRENT_DATE())
     AND YEAR(j.tanggal_mulai) = YEAR(CURRENT_DATE())
     ${line ? sql`AND j.line = ${line}` : sql``}
-ORDER BY 
+ORDER BY
     j.tanggal_selesai ASC;
     `);
 

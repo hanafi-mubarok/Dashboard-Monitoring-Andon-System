@@ -22,6 +22,7 @@ interface TimelineContentProps {
   forcedStep?: number;
   lineLabel: string;
   apiLine: string;
+  workshop?: string;
   showWorkstationTimeline?: boolean;
 }
 
@@ -165,6 +166,7 @@ export default function TimelineContent({
   forcedStep,
   lineLabel,
   apiLine,
+  workshop,
   showWorkstationTimeline = true,
 }: TimelineContentProps) {
   const normalizedLine = (apiLine ?? "").trim().toLowerCase();
@@ -192,7 +194,8 @@ export default function TimelineContent({
     setIsLoading(true);
     try {
       //console.log('[Timeline] Fetching data at', new Date().toLocaleTimeString('id-ID'));
-      const response = await fetch(`/api/production-progress/current?daysBack=${days}&line=${encodeURIComponent(apiLine)}`, {
+      const workshopParam = workshop ? `&workshop=${encodeURIComponent(workshop)}` : '';
+      const response = await fetch(`/api/production-progress/current?daysBack=${days}&line=${encodeURIComponent(apiLine)}${workshopParam}`, {
         cache: 'no-store',
       });
       if (!response.ok) throw new Error('Failed to fetch');
@@ -695,11 +698,8 @@ export default function TimelineContent({
                     const tanggalSelesai = product.tanggal_selesai ? new Date(product.tanggal_selesai) : null;
                     const today = new Date();
                     const presentaseFromTable = Number(product.percentage);
-                    const presentase = isLantai3
-                      ? (total > 0 ? Math.round((jumlahTungguQc / total) * 100) : 0)
-                      : (Number.isFinite(presentaseFromTable)
-                        ? presentaseFromTable
-                        : (total > 0 ? Math.round((jumlahTungguQc / total) * 100) : 0));
+                    // Use percentage directly from API; fall back to 0 if missing
+                    const presentase = Number.isFinite(presentaseFromTable) ? presentaseFromTable : 0;
                     
                     // Tentukan status berdasarkan kondisi
                     let status = 'To Do';
@@ -734,9 +734,7 @@ export default function TimelineContent({
                               <div className="text-sm font-semibold text-white truncate">{product.product_name || "-"}</div>
                               <div className="text-xs text-gray-300 truncate">Trainset {product.trainset ?? "-"}</div>
                               <div className="text-xs text-gray-400 truncate">
-                                {isLantai12
-                                  ? `${product.proses_produk ?? "-"}`
-                                  : `Personil: ${product.total_personil ?? "-"}`}
+                                {product.proses_produk ?? "-"}
                               </div>
                               <Badge className={`border-0 text-xs font-semibold ${statusBg} text-white`}>
                                 {status}
@@ -896,7 +894,7 @@ export default function TimelineContent({
                               )}
                               <div className="text-xs text-gray-400 mt-0.5">Selesai</div>
                               <div className="text-xs text-gray-300 whitespace-nowrap">
-                                {hideKanbanEstimateTarget ? formatDateTime(card.start_actual) : formatDateTime(card.finish_actual)}
+                                {hideKanbanEstimateTarget ? formatDateTime(card.start_actual) : formatDateTime(card.finish_actual || card.start_actual)}
                               </div>
                               {!hideKanbanEstimateTarget ? (
                                 <>
@@ -1009,7 +1007,7 @@ export default function TimelineContent({
     {/* Title */}
     <div className="text-white font-semibold mb-4 flex items-center gap-2">
       <Users className="w-4 h-4 text-blue-400" />
-      {isLantai12 ? "Operator yang melapor di 24 jam terakhir" : "Operator Aktif Hari Ini"}
+      Operator yang melapor di 24 jam terakhir
     </div>
 
     {/* Grid Operator */}
@@ -1185,14 +1183,14 @@ export default function TimelineContent({
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {abnormal && abnormal.length > 0 ? (
-                abnormal.map((item) => {
+                abnormal.map((item, abnormalIdx) => {
                   const kategoriColor = item.kategori?.includes('Laporan Abnormal') || item.status?.includes('Kurang Komponen')
                     ? 'border-rose-600 bg-rose-900/20' 
                     : 'border-amber-600 bg-amber-900/20';
                   
                   return (
                     <div
-                      key={`${item.operator_actual_rfid}-${item.product_name}`}
+                      key={`abnormal-${item.operator_actual_rfid}-${item.id_perproduct}-${abnormalIdx}`}
                       className={`p-4 rounded-lg border ${kategoriColor}`}
                     >
                       {/* Header - Operator & Status Badge */}

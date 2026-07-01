@@ -18,8 +18,10 @@ type JadwalPayload = {
   product_name: string;
   project: string | null;
   trainset: number;
+  sub_output: string | null;
   jumlah_tiapts: number | null;
   total_personil: number | null;
+  proses_produk: string | null;
   line: string | null;
   workshop: string | null;
   tanggal_mulai: string | null;
@@ -115,6 +117,9 @@ function normalizePayload(body: any): JadwalPayload | null {
   const trainset = Number(body?.trainset);
   if (!id_product || !product_name || Number.isNaN(trainset)) return null;
 
+  const sub_output = body?.sub_output && String(body.sub_output).trim() ? String(body.sub_output).trim() : null;
+  const proses_produk = body?.proses_produk && String(body.proses_produk).trim() ? String(body.proses_produk).trim() : null;
+
   const jumlah_tiapts = body?.jumlah_tiapts === null || body?.jumlah_tiapts === "" ? null : Number(body?.jumlah_tiapts);
   const total_personil = body?.total_personil === null || body?.total_personil === "" ? null : Number(body?.total_personil);
   
@@ -136,8 +141,10 @@ function normalizePayload(body: any): JadwalPayload | null {
     product_name,
     project,
     trainset,
+    sub_output,
     jumlah_tiapts: Number.isNaN(jumlah_tiapts) ? null : jumlah_tiapts,
     total_personil: Number.isNaN(total_personil) ? null : total_personil,
+    proses_produk,
     line,
     workshop,
     tanggal_mulai: body?.tanggal_mulai || null,
@@ -168,9 +175,10 @@ export async function GET(request: Request) {
     if (trainsetParam) {
       const trainset = Number(trainsetParam);
       result = await db.execute(sql`
-SELECT 
+    SELECT 
   j.id_product, 
   j.product_name,
+  j.sub_output,
   j.proses_produk,
   j.project,
   j.trainset, 
@@ -250,6 +258,7 @@ ORDER BY j.tanggal_mulai ASC;
         SELECT 
           j.id_product, 
           j.product_name,
+          j.sub_output,
           j.proses_produk,
           j.project,
           j.trainset, 
@@ -340,9 +349,9 @@ export async function POST(request: Request) {
 
     await db.execute(sql`
       INSERT INTO jadwal
-        (id_product, product_name, project, trainset, jumlah_tiapts, total_personil, operator_assigned1, operator_assigned2, operator_assigned3, line, workshop, tanggal_mulai, tanggal_selesai)
+        (id_product, product_name, sub_output, proses_produk, project, trainset, jumlah_tiapts, total_personil, operator_assigned1, operator_assigned2, operator_assigned3, line, workshop, tanggal_mulai, tanggal_selesai)
       VALUES
-        (${payload.id_product}, ${payload.product_name}, ${payload.project}, ${payload.trainset}, ${payload.jumlah_tiapts}, ${payload.total_personil}, ${payload.operator_assigned1}, ${payload.operator_assigned2}, ${payload.operator_assigned3}, ${payload.line}, ${payload.workshop}, ${payload.tanggal_mulai}, ${payload.tanggal_selesai})
+        (${payload.id_product}, ${payload.product_name}, ${payload.sub_output}, ${payload.proses_produk}, ${payload.project}, ${payload.trainset}, ${payload.jumlah_tiapts}, ${payload.total_personil}, ${payload.operator_assigned1}, ${payload.operator_assigned2}, ${payload.operator_assigned3}, ${payload.line}, ${payload.workshop}, ${payload.tanggal_mulai}, ${payload.tanggal_selesai})
     `);
 
     return NextResponse.json({ success: true });
@@ -369,6 +378,8 @@ export async function PUT(request: Request) {
       SET
         id_product = ${payload.id_product},
         product_name = ${payload.product_name},
+        sub_output = ${payload.sub_output},
+        proses_produk = ${payload.proses_produk},
         project = ${payload.project},
         trainset = ${payload.trainset},
         jumlah_tiapts = ${payload.jumlah_tiapts},

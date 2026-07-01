@@ -79,7 +79,7 @@ export default function ProductSummaryCardLantai2({ data }: ProductSummaryCardLa
       if (history !== null) return; // already fetched
       setHistoryLoading(true);
       try {
-        const res = await fetch(`/api/product/protrack-history?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}&line=${encodeURIComponent(String(data.line ?? 'Lantai 2'))}`);
+        const res = await fetch(`/api/product/protrack-history?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}&line=${encodeURIComponent('Lantai 2')}`);
         if (!res.ok) throw new Error('Fetch failed');
         const json = await res.json();
         if (!mounted) return;
@@ -99,7 +99,7 @@ export default function ProductSummaryCardLantai2({ data }: ProductSummaryCardLa
       if (missingSubProcess !== null) return; // already fetched
       setMissingLoading(true);
       try {
-        const res = await fetch(`/api/product/missing-subprocess?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}&line=${encodeURIComponent(String(data.line ?? 'Lantai 2'))}`);
+        const res = await fetch(`/api/product/missing-subprocess?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}&line=${encodeURIComponent('Lantai 2')}`);
         if (!res.ok) throw new Error('Fetch failed');
         const json = await res.json();
         if (!mounted) return;
@@ -116,7 +116,7 @@ export default function ProductSummaryCardLantai2({ data }: ProductSummaryCardLa
     fetchHistory();
     fetchMissingSubProcess();
     return () => { mounted = false; };
-  }, [isExpanded, data.id_product, data.trainset, history]);
+  }, [isExpanded, data.id_product, data.trainset, history, missingSubProcess]);
 
   // Derived aggregates: prefer history values when available
   const averageFromHistory = (() => {

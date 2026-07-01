@@ -99,11 +99,11 @@ export default function ProductSummaryCardLantai1({ data }: ProductSummaryCardLa
       if (missingSubProcess !== null) return; // already fetched
       setMissingLoading(true);
       try {
-        console.log('[ProductSummaryCardLantai1] Fetching missing subprocess for:', data.id_product, data.trainset);
-        const res = await fetch(`/api/product/missing-subprocess?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}`);
+        //console.log('[ProductSummaryCardLantai1] Fetching missing subprocess for:', data.id_product, data.trainset);
+        const res = await fetch(`/api/product/missing-subprocess?id_product=${encodeURIComponent(String(data.id_product))}&trainset=${encodeURIComponent(String(data.trainset))}&line=${encodeURIComponent('Lantai 1')}`);
         if (!res.ok) throw new Error('Fetch failed');
         const json = await res.json();
-        console.log('[ProductSummaryCardLantai1] Missing subprocess response:', json);
+        //console.log('[ProductSummaryCardLantai1] Missing subprocess response:', json);
         if (!mounted) return;
         setMissingSubProcess(json.data || []);
         setMissingError(null);

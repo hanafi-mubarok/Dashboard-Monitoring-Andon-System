@@ -1,5 +1,7 @@
 import ModernSidebar from "@/components/ui/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
 import Link from "next/link";
 import MonitoringKpmFilters from "./monitoring-kpm-filters";
 import MaterialOutLineChart from "@/components/material/MaterialOutLineChart";
@@ -10,12 +12,17 @@ import {
   type MonitoringKpmSortBy,
   type SortDirection,
   getMaterialOutLineChart,
+  getMaterialOutDoughnutChart,
   getAvailableMonths,
 } from "@/lib/queries/stok_material";
 
 interface MonitoringKpmPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
+
+type JwtPayload = {
+  role?: string;
+};
 
 const SORTABLE_COLUMNS: Array<{ key: MonitoringKpmSortBy; label: string }> = [
   { key: "ts", label: "TS" },
@@ -45,6 +52,15 @@ function formatDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("id-ID");
+}
+
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined) return "-";
+  try {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function buildSortHref(
@@ -90,7 +106,26 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
   const requestedPage = parseInt(getQueryValue(resolvedSearchParams.page) || "1", 10);
   const page = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage;
 
-  const [rows, filterOptions, materialOutLineChart, availableMonths] = await Promise.all([
+  let canSeeHarga = false;
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+    const secret = process.env.JWT_SECRET;
+
+    if (token && secret) {
+      const decoded = jwt.verify(token, secret) as JwtPayload;
+      canSeeHarga =
+        decoded?.role === "PERENCANAAN" ||
+        decoded?.role === "PENGENDALIAN" ||
+        decoded?.role === "ADMIN";
+    }
+  } catch {
+    canSeeHarga = false;
+  }
+
+  const tableColSpan = canSeeHarga ? 17 : 16;
+
+  const [rows, filterOptions, materialOutLineChart, materialOutDoughnutChart, availableMonths] = await Promise.all([
     // rows with pagination: limit 100
     getMonitoringKpmRows({
       st,
@@ -104,6 +139,7 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
     }),
     getMonitoringKpmFilterOptions(),
     getMaterialOutLineChart(selectedMonth),
+    getMaterialOutDoughnutChart(selectedMonth),
     getAvailableMonths(),
   ]);
 
@@ -158,6 +194,8 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
 
         <MaterialOutLineChart
           data={materialOutLineChart}
+          doughnutData={materialOutDoughnutChart}
+          showHarga={canSeeHarga}
           monthLabel={new Intl.DateTimeFormat('id-ID', {
             month: 'long',
             year: 'numeric',
@@ -205,6 +243,9 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
                   <th className="text-left p-3 text-gray-300 font-semibold">Komat</th>
                   <th className="text-left p-3 text-gray-300 font-semibold">Spesifikasi</th>
                   <th className="text-left p-3 text-gray-300 font-semibold">Proyek</th>
+                  {canSeeHarga ? (
+                    <th className="text-left p-3 text-gray-300 font-semibold">Harga Material</th>
+                  ) : null}
                   <th className="text-left p-3 text-gray-300 font-semibold">Typecar</th>
                   {SORTABLE_COLUMNS.map((column) => {
                     const isActive = sortBy === column.key;
@@ -222,8 +263,6 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
                     );
                   })}
                   <th className="text-left p-3 text-gray-300 font-semibold">Qty Diminta</th>
-                  <th className="text-left p-3 text-gray-300 font-semibold">UOM</th>
-                  <th className="text-left p-3 text-gray-300 font-semibold">SN</th>
                   <th className="text-left p-3 text-gray-300 font-semibold">Qty Ready</th>
                 </tr>
               </thead>
@@ -242,21 +281,22 @@ export default async function MonitoringKpmPage({ searchParams }: MonitoringKpmP
                       <td className="p-3 text-gray-200">{row.komat ?? "-"}</td>
                       <td className="p-3 text-gray-200 min-w-[240px]">{row.spesifikasi ?? "-"}</td>
                       <td className="p-3 text-gray-200">{row.proyek ?? "-"}</td>
+                      {canSeeHarga ? (
+                        <td className="p-3 text-gray-200">{formatCurrency(row.total_harga)}</td>
+                      ) : null}
                       <td className="p-3 text-gray-200">{row.typecar ?? "-"}</td>
                       <td className="p-3 text-gray-200">{row.ts ?? "-"}</td>
                       <td className="p-3 text-gray-200">{row.pic ?? "-"}</td>
                       <td className="p-3 text-gray-200">{row.status ?? "-"}</td>
                       <td className="p-3 text-gray-200">{formatDate(row.tgl_ready)}</td>
                       <td className="p-3 text-gray-200">{row.status_komponen ?? "-"}</td>
-                      <td className="p-3 text-gray-200">{row.qty ?? "-"}</td>
-                      <td className="p-3 text-gray-200">{row.uom ?? "-"}</td>
-                      <td className="p-3 text-gray-200">{row.sn ?? "-"}</td>
+                      <td className="p-3 text-gray-200">{row.qty != null ? `${row.qty} ${row.uom ?? ''}` : "-"}</td>
                       <td className="p-3 text-gray-200">{row.qty_ready ?? "-"}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={18} className="p-8 text-center text-gray-400">
+                    <td colSpan={tableColSpan} className="p-8 text-center text-gray-400">
                       Data tidak ditemukan untuk filter saat ini.
                     </td>
                   </tr>

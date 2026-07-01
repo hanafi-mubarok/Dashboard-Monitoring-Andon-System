@@ -7,9 +7,10 @@ import type { ProductSummaryLantai1 } from '@/lib/queries/production-progress-pr
 
 interface ProductSummaryListLantai1Props {
   trainset: string | number;
+  project?: string;
 }
 
-export default function ProductSummaryListLantai1({ trainset }: ProductSummaryListLantai1Props) {
+export default function ProductSummaryListLantai1({ trainset, project }: ProductSummaryListLantai1Props) {
   const [data, setData] = useState<ProductSummaryLantai1[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +19,10 @@ export default function ProductSummaryListLantai1({ trainset }: ProductSummaryLi
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/product/summary-lantai1?trainset=${trainset}`);
+        const params = new URLSearchParams();
+        params.set('trainset', String(trainset));
+        if (project) params.set('project_name', project);
+        const response = await fetch(`/api/product/summary-lantai1?${params.toString()}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -37,7 +41,7 @@ export default function ProductSummaryListLantai1({ trainset }: ProductSummaryLi
     };
 
     fetchData();
-  }, [trainset]);
+  }, [trainset, project]);
 
   if (loading) {
     return (

@@ -242,6 +242,46 @@ function getProductColorByProcess(prosesProduk: string | null | undefined): stri
   return colors[Math.abs(hash) % colors.length];
 }
 
+function getProductColorByProcessWithPalette(prosesProduk: string | null | undefined, palette: 'default' | 'dark' = 'default') {
+  const value = (prosesProduk || '').trim();
+  if (!value) return 'bg-gray-500';
+
+  const defaultColors = [
+    'bg-blue-600',
+    'bg-red-600',
+    'bg-violet-600',
+    'bg-cyan-500',
+    'bg-fuchsia-600',
+    'bg-sky-500',
+    'bg-rose-600',
+    'bg-indigo-600',
+    'bg-pink-600',
+    'bg-purple-500',
+  ];
+
+  const darkColors = [
+    'bg-blue-800',
+    'bg-rose-800',
+    'bg-violet-800',
+    'bg-slate-800',
+    'bg-fuchsia-800',
+    'bg-sky-700',
+    'bg-amber-800',
+    'bg-indigo-800',
+    'bg-pink-800',
+    'bg-purple-800',
+  ];
+
+  const colors = palette === 'dark' ? darkColors : defaultColors;
+
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
 function isLantai12(line: string | null | undefined): boolean {
   const searchText = (line || '').toLowerCase();
   return (
@@ -320,10 +360,16 @@ export default function JadwalClient({
   initialRows,
   selectedLine = "Lantai 3",
   canManageSchedule = false,
+  disableAutoRefresh = false,
+  useProcessColor = false,
+  processPalette = 'default',
 }: {
   initialRows: JadwalRow[];
   selectedLine?: string;
   canManageSchedule?: boolean;
+  disableAutoRefresh?: boolean;
+  useProcessColor?: boolean;
+  processPalette?: 'default' | 'dark';
 }) {
   // Get current month-year as default filter
   const getCurrentMonthYear = () => {
@@ -450,10 +496,10 @@ export default function JadwalClient({
     };
   }, [rows, monthYearFilter, selectedLine]); // Refetch when rows or month-year filter change
 
-  // Auto-refresh data on page load
+  // Auto-refresh data on page load (can be disabled when server provides initialRows)
   useEffect(() => {
-    refreshRows();
-  }, []); // Run once on mount
+    if (!disableAutoRefresh) refreshRows();
+  }, [disableAutoRefresh]); // Run once on mount unless disabled
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -812,16 +858,17 @@ export default function JadwalClient({
             floorsSet.add('Lantai 1');
           }
 
-          if (isLantai12(row.line) && row.proses_produk) {
+          if ((isLantai12(row.line) && row.proses_produk) || (useProcessColor && row.proses_produk)) {
             processSet.add(row.proses_produk);
           }
         });
         const uniqueFloors = Array.from(floorsSet).sort();
         const uniqueProcesses = Array.from(processSet).sort((a, b) => a.localeCompare(b));
-        const showProcessLegend =
+        const showProcessLegend = useProcessColor || (
           uniqueProcesses.length > 0 &&
           uniqueFloors.length > 0 &&
-          uniqueFloors.every((floor) => floor === 'Lantai 1' || floor === 'Lantai 2');
+          uniqueFloors.every((floor) => floor === 'Lantai 1' || floor === 'Lantai 2')
+        );
         
         // Get today's date key for comparison
         const todayKey = toDateKey(today);
@@ -856,7 +903,7 @@ export default function JadwalClient({
                       {showProcessLegend ? (
                         uniqueProcesses.map((proses) => (
                           <div key={proses} className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded ${getProductColorByProcess(proses)}`}></div>
+                            <div className={`w-3 h-3 rounded ${useProcessColor ? getProductColorByProcessWithPalette(proses, processPalette as 'default' | 'dark') : getProductColorByProcess(proses)}`}></div>
                             <span className="text-xs text-gray-300">{proses}</span>
                           </div>
                         ))
@@ -974,11 +1021,13 @@ export default function JadwalClient({
                         const leftPercent = (startOffset / totalDays) * 100;
                         const widthPercent = (duration / totalDays) * 100;
                         
-                        const productColor = isLantai12(row.line)
-                          ? (row.proses_produk
-                            ? getProductColorByProcess(row.proses_produk)
-                            : getProductColorByFloor(row.line))
-                          : getProductColorByFloor(row.line);
+                        const productColor = useProcessColor
+                          ? getProductColorByProcessWithPalette(row.proses_produk, processPalette as 'default' | 'dark')
+                          : (isLantai12(row.line)
+                            ? (row.proses_produk
+                              ? getProductColorByProcess(row.proses_produk)
+                              : getProductColorByFloor(row.line))
+                            : getProductColorByFloor(row.line));
                         
                         return (
                           <div key={`gantt-${row.id_product}-${idx}`} className="flex border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">

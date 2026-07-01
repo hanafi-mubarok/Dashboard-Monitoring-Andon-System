@@ -175,6 +175,8 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [daysFilter, setDaysFilter] = useState(0); // 0 = semua data
   const [globalSearch, setGlobalSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   // Filter by date range (last N days)
   const dateFiltered = useMemo(() => {
@@ -243,6 +245,19 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
     return sorted;
   }, [filtered, sortColumn, sortDirection]);
 
+  // Reset to page 1 when data changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [sorted.length, daysFilter, globalSearch]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(sorted.length / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return sorted.slice(start, end);
+  }, [sorted, currentPage]);
+
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -265,7 +280,7 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-white font-semibold text-lg">Detail Produksi</h2>
-          <p className="text-sm text-gray-400">{sorted.length} item ditampilkan dari {data.length} total</p>
+          <p className="text-sm text-gray-400">{paginatedData.length} item ditampilkan di halaman {currentPage} dari {totalPages} | Total: {sorted.length} dari {data.length}</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -411,14 +426,14 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
           </thead>
 
           <tbody className="divide-y divide-gray-700">
-            {sorted.length === 0 ? (
+            {paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                   Tidak ada data yang ditemukan
                 </td>
               </tr>
             ) : (
-              sorted.map((item, idx) => {
+              paginatedData.map((item, idx) => {
                 const statusColor = getStatusColor(item.status);
                 const statusIcon = getStatusIcon(item.status);
                 const isWaitingMulai = item.status?.toLowerCase().includes('tunggu mulai');
@@ -482,6 +497,57 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-400">
+            Halaman <span className="font-semibold text-white">{currentPage}</span> dari <span className="font-semibold text-white">{totalPages}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded text-sm hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Sebelumnya
+            </button>
+
+            {/* Page Input */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-300">Ke halaman:</label>
+              <input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={currentPage}
+                onChange={(e) => {
+                  const pageNum = parseInt(e.target.value, 10);
+                  if (pageNum >= 1 && pageNum <= totalPages) {
+                    setCurrentPage(pageNum);
+                  }
+                }}
+                className="w-16 px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded text-sm hover:bg-slate-600 transition-colors focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded text-sm hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Selanjutnya
+            </button>
+          </div>
+
+          <div className="text-sm text-gray-400">
+            Baris per halaman: <span className="font-semibold text-white">{itemsPerPage}</span>
+          </div>
+        </div>
+      )}
 
     </div>
   );

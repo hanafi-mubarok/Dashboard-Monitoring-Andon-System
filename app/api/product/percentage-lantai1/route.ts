@@ -1,9 +1,12 @@
+import { NextRequest } from 'next/server';
 import { getProductPercentageLantai1 } from '@/lib/queries/production-progress-protrack';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data = await getProductPercentageLantai1();
-    //console.log('[API] Product Percentage Lantai 1 data:', data);
+    const searchParams = request.nextUrl.searchParams;
+    const project = searchParams.get('project_name') ?? undefined;
+    const trainset = searchParams.get('trainset') ?? undefined;
+    const data = await getProductPercentageLantai1(project, trainset);
     return Response.json({ success: true, data });
   } catch (error) {
     console.error('Failed to fetch product percentage data:', error);

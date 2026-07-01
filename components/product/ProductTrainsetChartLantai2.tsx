@@ -318,6 +318,7 @@ export default function ProductTrainsetChartLantai2({ data, trainset }: ProductT
       <CardContent className="p-4 sm:p-6">
         {groupedData.length > 0 && labels.length > 0 ? (
           <div className="h-[480px] w-full">
+  
             <Bar data={chartData} options={options} />
           </div>
         ) : (

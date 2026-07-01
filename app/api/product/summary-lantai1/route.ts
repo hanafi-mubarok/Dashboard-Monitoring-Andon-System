@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const trainset = searchParams.get('trainset');
+    const project = searchParams.get('project_name') ?? undefined;
 
     if (!trainset) {
       return NextResponse.json(
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await getProductSummaryLantai1(trainset);
+    const data = await getProductSummaryLantai1(trainset, project);
 
     return NextResponse.json({ success: true, data });
   } catch (error) {

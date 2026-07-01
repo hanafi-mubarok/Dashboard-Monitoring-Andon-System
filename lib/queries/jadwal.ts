@@ -290,6 +290,73 @@ export async function getProcessBarLantai3(): Promise<JadwalRow[]> {
     return getProcessBarByLine('Lantai 3');
 }
 
+export async function getTabelJadwalByWorkshop(workshop: string): Promise<JadwalRow[]> {
+    try {
+        const normalizedWorkshop = (workshop ?? '').trim();
+        if (!normalizedWorkshop) return [];
+
+        // Reuse the same query as getTabelJadwalByLine but filter by workshop
+        const result = await db.execute(sql`
+            SELECT
+                j.id_product,
+                j.product_name,
+                j.proses_produk,
+                j.project,
+                j.trainset,
+                j.jumlah_tiapts,
+                j.total_personil,
+                j.line,
+                j.workshop,
+                j.tanggal_mulai,
+                j.tanggal_selesai,
+
+                COALESCE(p.jumlah_tunggu_qc, 0) AS jumlah_tunggu_qc,
+                COALESCE(p.jumlah_finish_good, 0) AS jumlah_finish_good,
+
+                it.duration_time AS total_ideal_time_qc,
+
+                GREATEST(
+                    j.jumlah_tiapts - COALESCE(p.jumlah_tunggu_qc,0),
+                    0
+                ) AS jumlah_kekurangan,
+
+                CASE
+                    WHEN COALESCE(p.jumlah_tunggu_qc,0) = j.jumlah_tiapts
+                        AND j.trainset = p.trainset
+                        AND p.last_progress <= j.tanggal_selesai
+                    THEN 'Tepat Waktu'
+                    WHEN COALESCE(p.jumlah_tunggu_qc,0) <> j.jumlah_tiapts
+                        AND CURRENT_DATE() > j.tanggal_selesai
+                    THEN 'Terlambat / Tidak Tercatat'
+                    WHEN CURRENT_DATE() BETWEEN DATE_SUB(j.tanggal_selesai, INTERVAL 3 DAY) AND j.tanggal_selesai
+                    THEN CONCAT('Kurang ', DATEDIFF(j.tanggal_selesai, CURRENT_DATE()), ' Hari')
+                    WHEN MONTH(j.tanggal_selesai) <> MONTH(CURRENT_DATE()) OR YEAR(j.tanggal_selesai) <> YEAR(CURRENT_DATE())
+                    THEN 'Waiting List'
+                    ELSE 'On Progress'
+                END AS status
+            FROM jadwal AS j
+            LEFT JOIN (
+                SELECT id_product, trainset,
+                    COUNT(DISTINCT CASE WHEN status = 'Tunggu QC' THEN id_perproduct END) AS jumlah_tunggu_qc,
+                    COUNT(DISTINCT CASE WHEN status = 'Finish Good' THEN id_perproduct END) AS jumlah_finish_good,
+                    MAX(start_actual) AS last_progress
+                FROM production_progress
+                WHERE MONTH(start_actual) = MONTH(CURRENT_DATE()) AND YEAR(start_actual) = YEAR(CURRENT_DATE())
+                GROUP BY id_product, trainset
+            ) p ON j.id_product = p.id_product AND j.trainset = p.trainset
+            LEFT JOIN ideal_time it ON j.id_product = it.id_product AND it.process_name = 'total_production_qc'
+            WHERE j.workshop = ${normalizedWorkshop}
+            ORDER BY j.tanggal_mulai ASC;
+        `);
+
+        const rows = Array.isArray(result[0]) ? result[0] : result;
+        return rows as JadwalRow[];
+    } catch (error) {
+        console.error("Gagal mengambil data jadwal by workshop:", error);
+        return [];
+    }
+}
+
 
 
 export async function getScheduleStatistics(monthYear?: string, line: string = 'Lantai 3'): Promise<StatisticRow[]> {
