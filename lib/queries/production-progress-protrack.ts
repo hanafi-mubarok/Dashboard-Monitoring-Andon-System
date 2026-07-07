@@ -2120,7 +2120,7 @@ ORDER BY j.product_name ASC;
     `);
 
     const rows = extractRows(result);
-    console.log("Fetched product percentage Sukosari:", rows);
+    //console.log("Fetched product percentage Sukosari:", rows);
     return rows as ProductPercentageSukosari[];
   } catch (error) {
     console.error("Failed to fetch product percentage Sukosari:", error);
@@ -2298,7 +2298,7 @@ ORDER BY product_name,id_product,trainset,start_actual;
     `);
 
     const rows = extractRows(result);
-    console.log("Fetched product percentage Tiron:", rows);
+    //console.log("Fetched product percentage Tiron:", rows);
     return rows as ProductPercentageTiron[];
   } catch (error) {
     console.error("Failed to fetch product percentage Tiron:", error);
