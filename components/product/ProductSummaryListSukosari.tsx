@@ -8,9 +8,10 @@ import type { ProductSummarySukosari } from '@/lib/queries/production-progress-p
 interface ProductSummaryListSukosariProps {
   trainset: string | number;
   project?: string;
+  workshop?: string;
 }
 
-export default function ProductSummaryListSukosari({ trainset, project }: ProductSummaryListSukosariProps) {
+export default function ProductSummaryListSukosari({ trainset, project, workshop = 'Sukosari' }: ProductSummaryListSukosariProps) {
   const [data, setData] = useState<ProductSummarySukosari[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,8 @@ export default function ProductSummaryListSukosari({ trainset, project }: Produc
         const params = new URLSearchParams();
         params.set('trainset', String(trainset));
         if (project) params.set('project_name', project);
-        const response = await fetch(`/api/product/summary-sukosari?${params.toString()}`);
+        const endpoint = workshop.toLowerCase() === 'tiron' ? 'summary-tiron' : 'summary-sukosari';
+        const response = await fetch(`/api/product/${endpoint}?${params.toString()}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -87,7 +89,7 @@ export default function ProductSummaryListSukosari({ trainset, project }: Produc
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-white mb-4">Summary Produk - Sukosari</h2>
+        <h2 className="text-xl font-bold text-white mb-4">Summary Produk - {workshop}</h2>
       </div>
       <div className="grid gap-4">
         {data.map((product, index) => (

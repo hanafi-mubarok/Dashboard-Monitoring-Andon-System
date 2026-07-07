@@ -4,10 +4,11 @@ import { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Elapsed from '@/components/ui/elapsed';
-import type { ProductionProgress } from '@/lib/queries/production-progress';
+import type { ProductionProgress } from '@/lib/queries/production-progress-protrack';
 
 interface ProductionProgressTableProps {
   data: ProductionProgress[];
+  mode?: 'default' | 'protrack';
 }
 
 type SortColumn = 'id_perproduct' | 'product_name' | 'workstation' | 'operator_actual_name' | 'start_actual' | 'duration_time_actual' | 'finish_actual' | 'status';
@@ -170,7 +171,7 @@ function getStatusIcon(status?: string | null) {
   return '○';
 }
 
-export default function ProductionProgressTable({ data }: ProductionProgressTableProps) {
+export default function ProductionProgressTable({ data, mode = 'default' }: ProductionProgressTableProps) {
   const [sortColumn, setSortColumn] = useState<SortColumn>('start_actual');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [daysFilter, setDaysFilter] = useState(0); // 0 = semua data
@@ -330,110 +331,164 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
         <table className="w-full bg-gray-900">
           <thead className="bg-gray-800 border-b border-gray-700">
             <tr>
-              {/* ID Perproduk */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('id_perproduct')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  ID Perproduk
-                  <SortIcon column="id_perproduct" />
-                </button>
-              </th>
+              {mode === 'protrack' ? (
+                <>
+                  <th className="px-4 py-3 text-left text-white">ID Perproduk</th>
+                  <th className="px-4 py-3 text-left text-white">Nama Produk</th>
+                  <th className="px-4 py-3 text-left text-white">Sub-proses</th>
+                  <th className="px-4 py-3 text-left text-white">Operator</th>
+                  <th className="px-4 py-3 text-left text-white">Mulai</th>
+                  <th className="px-4 py-3 text-left text-white">Status</th>
+                  <th className="px-4 py-3 text-left text-white">Presentase</th>
+                  <th className="px-4 py-3 text-left text-white">QTY</th>
+                </>
+              ) : (
+                <>
+                  {/* ID Perproduk */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('id_perproduct')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      ID Perproduk
+                      <SortIcon column="id_perproduct" />
+                    </button>
+                  </th>
 
-              {/* Product Name */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('product_name')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Nama Produk
-                  <SortIcon column="product_name" />
-                </button>
-              </th>
+                  {/* Product Name */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('product_name')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Nama Produk
+                      <SortIcon column="product_name" />
+                    </button>
+                  </th>
 
-              {/* Workstation */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('workstation')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Workstation
-                  <SortIcon column="workstation" />
-                </button>
-              </th>
+                  {/* Workstation */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('workstation')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Workstation
+                      <SortIcon column="workstation" />
+                    </button>
+                  </th>
 
-              {/* Operator */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('operator_actual_name')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Operator
-                  <SortIcon column="operator_actual_name" />
-                </button>
-              </th>
+                  {/* Operator */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('operator_actual_name')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Operator
+                      <SortIcon column="operator_actual_name" />
+                    </button>
+                  </th>
 
-              {/* Start Actual */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('start_actual')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Mulai
-                  <SortIcon column="start_actual" />
-                </button>
-              </th>
+                  {/* Start Actual */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('start_actual')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Mulai
+                      <SortIcon column="start_actual" />
+                    </button>
+                  </th>
 
-              {/* Duration */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('duration_time_actual')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Durasi
-                  <SortIcon column="duration_time_actual" />
-                </button>
-              </th>
+                  {/* Duration */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('duration_time_actual')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Durasi
+                      <SortIcon column="duration_time_actual" />
+                    </button>
+                  </th>
 
-              {/* Finish Actual */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('finish_actual')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Selesai
-                  <SortIcon column="finish_actual" />
-                </button>
-              </th>
+                  {/* Finish Actual */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('finish_actual')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Selesai
+                      <SortIcon column="finish_actual" />
+                    </button>
+                  </th>
 
-              {/* Status */}
-              <th className="px-4 py-3 text-left">
-                <button
-                  onClick={() => handleSort('status')}
-                  className="flex items-center gap-2 font-semibold text-gray-200 hover:text-white transition-colors"
-                >
-                  Status
-                  <SortIcon column="status" />
-                </button>
-              </th>
+                  {/* Status */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-2 font-semibold text-white hover:text-white transition-colors"
+                    >
+                      Status
+                      <SortIcon column="status" />
+                    </button>
+                  </th>
 
-              {/* Realisasi */}
-              <th className="px-4 py-3 text-left">
-                <span className="font-semibold text-gray-200">Realisasi</span>
-              </th>
+                  {/* Realisasi */}
+                  <th className="px-4 py-3 text-left text-white">
+                    <span className="font-semibold text-white">Realisasi</span>
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
 
           <tbody className="divide-y divide-gray-700">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={mode === 'protrack' ? 8 : 9} className="px-4 py-8 text-center text-gray-400">
                   Tidak ada data yang ditemukan
                 </td>
               </tr>
             ) : (
               paginatedData.map((item, idx) => {
+                if (mode === 'protrack') {
+                  const statusColor = getStatusColor(item.status);
+                  const statusIcon = getStatusIcon(item.status);
+                  return (
+                    <tr key={`${item.id_perproduct || item.id_process || idx}`} className="hover:bg-gray-800/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200 font-medium">{item.id_perproduct || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200" title={item.product_name || ''}>{item.product_name || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200 truncate max-w-[160px]" title={item.sub_process || item.process_name || ''}>{item.sub_process || item.process_name || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200" title={item.operator_actual_name || ''}>{item.operator_actual_name || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-300 text-sm">{formatDateTime(item.start_actual)}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          className={`${statusColor.bg} ${statusColor.border} ${statusColor.text} border text-xs font-semibold`}
+                        >
+                          <span className="mr-1">{statusIcon}</span>
+                          {item.status || 'Unknown'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200 font-semibold">{item.percentage != null ? `${item.percentage}%` : '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-200">{(item.qty_progress ?? '—') + '/' + (item.total ?? '—')}</span>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                // default mode row (existing layout)
                 const statusColor = getStatusColor(item.status);
                 const statusIcon = getStatusIcon(item.status);
                 const isWaitingMulai = item.status?.toLowerCase().includes('tunggu mulai');
@@ -442,7 +497,7 @@ export default function ProductionProgressTable({ data }: ProductionProgressTabl
                 const isPaused = isWaitingSelesai;
 
                 return (
-                  <tr key={`${item.id_process}-${idx}`} className="hover:bg-gray-800/50 transition-colors">
+                  <tr key={`${item.id_process || item.id_perproduct || idx}`} className="hover:bg-gray-800/50 transition-colors">
                     <td className="px-4 py-3">
                       <span className="text-gray-200 font-medium">{item.id_perproduct || '—'}</span>
                     </td>

@@ -20,6 +20,10 @@ export interface ProductionProgress {
   line: string | null;
   workshop: string | null;
   process_name: string | null;
+  sub_process?: string | null;
+  percentage?: number | null;
+  qty_progress?: number | null;
+  total?: number | null;
   workstation: number | null;
   operator_actual_rfid: number | null;
   operator_actual_name: string | null;
@@ -133,6 +137,38 @@ export interface ProductPercentageSukosari {
 }
 
 export interface ProductSummarySukosari {
+  id_product: string;
+  trainset: string | number;
+  product_name: string | null;
+  line: string | null;
+  percentage: number;
+  percentage_cutting: number;
+  percentage_marking: number;
+  qty_progress: number;
+  total: number;
+  tanggal_mulai: Date | string | null;
+  tanggal_selesai: Date | string | null;
+  start_actual: Date | string | null;
+  finish_actual: Date | string | null;
+}
+
+export interface ProductPercentageTiron {
+  id_product: string;
+  trainset: string | number;
+  product_name: string | null;
+  jumlah_tiapts: number | null;
+  proses_produk: string | null;
+  line: string | null;
+  status: string;
+  percentage: number;
+  qty_progress: number;
+  total: number;
+  tanggal_mulai: Date | string | null;
+  start_actual?: Date | string | null;
+  project?: string | null;
+}
+
+export interface ProductSummaryTiron {
   id_product: string;
   trainset: string | number;
   product_name: string | null;
@@ -1352,10 +1388,11 @@ SELECT
   l.id_product,
   l.id_perproduct,
   l.product_name,
+  l.sub_process,
   l.process_name,
-  NULL AS percentage,
-  NULL AS qty_progress,
-  NULL AS total,
+  COALESCE(l.percentage, 0) AS percentage,
+  COALESCE(l.qty_progress, 0) AS qty_progress,
+  COALESCE(l.total, 0) AS total,
   l.operator_actual_name,
   ws1.ws1_start_actual as start_actual,
   l.finish_actual,
@@ -2017,6 +2054,7 @@ export async function getProductPercentageSukosari(
   trainset?: string
 ): Promise<ProductPercentageSukosari[]> {
   try {
+    const targetWorkshop = workshop ?? 'Sukosari';
     const result = await db.execute(sql`
 SELECT 
     j.id_product,
@@ -2074,7 +2112,7 @@ LEFT JOIN (
     AND j.trainset = pp.trainset
     AND j.proses_produk = pp.sub_process
 
-WHERE j.workshop = 'Sukosari'
+WHERE j.workshop = ${targetWorkshop}
 ${project ? sql`AND j.project = ${project}` : sql``}
 ${trainset ? sql`AND j.trainset = ${trainset}` : sql``}
 
@@ -2086,6 +2124,184 @@ ORDER BY j.product_name ASC;
     return rows as ProductPercentageSukosari[];
   } catch (error) {
     console.error("Failed to fetch product percentage Sukosari:", error);
+    return [];
+  }
+}
+
+
+export async function getProductSummaryTiron(
+  trainset: string | number,
+  workshop?: string,
+  project?: string
+): Promise<ProductSummaryTiron[]> {
+  try {
+    const result = await db.execute(sql`
+
+WITH latest_progress AS (
+    SELECT p1.*
+    FROM production_progress_protrack p1
+    JOIN (
+        SELECT
+            id_product,
+            trainset,
+            sub_output,
+            sub_process,
+            MAX(start_actual) AS max_time
+        FROM production_progress_protrack
+        WHERE workshop='Tiron'
+          AND trainset=${trainset}
+          ${project ? sql`AND project_name=${project}` : sql``}
+        GROUP BY id_product,trainset,sub_output,sub_process
+    ) l
+      ON p1.id_product=l.id_product
+     AND p1.trainset=l.trainset
+     AND p1.sub_output=l.sub_output
+     AND p1.sub_process=l.sub_process
+     AND p1.start_actual=l.max_time
+),
+product_name_per_product AS (
+    SELECT
+        id_product,
+        trainset,
+        MAX(product_name) AS product_name
+    FROM production_progress_protrack
+    WHERE workshop='Tiron'
+      AND trainset=${trainset}
+      ${project ? sql`AND project_name=${project}` : sql``}
+    GROUP BY id_product,trainset
+),
+last_process AS (
+    SELECT id_product,MAX(id_process) AS last_process_id
+    FROM master_proses_sks
+    WHERE sub_proses NOT IN ('QC REKA','QC INKA')
+    GROUP BY id_product
+),
+base AS (
+    SELECT DISTINCT id_product,trainset
+    FROM jadwal
+    WHERE workshop='Tiron'
+      AND trainset=${trainset}
+      ${project ? sql`AND project=${project}` : sql``}
+    UNION
+    SELECT DISTINCT id_product,trainset
+    FROM latest_progress
+    WHERE trainset=${trainset}
+)
+SELECT
+    b.id_product,
+    b.trainset,
+    COALESCE(MAX(j.product_name),pn.product_name) AS product_name,
+    MAX(j.line) AS line,
+    CASE
+      WHEN MAX(CASE WHEN pm.id_process=lp.last_process_id THEN 1 ELSE 0 END)=1
+      THEN 100
+      ELSE ROUND(MAX(COALESCE(p.percentage,0))/MAX(COALESCE(mp.jumlah_proses_per_line,1)),0)
+    END AS percentage,
+    MAX(COALESCE(p.percentage,0)) AS actual_percentage,
+    MAX(COALESCE(mp.jumlah_proses_per_line,1)) AS total_proses,
+    COUNT(DISTINCT p.sub_output) AS actual_sub_output,
+    MAX(COALESCE(p.qty_progress,0)) AS qty_progress,
+    MAX(COALESCE(p.total,0)) AS total,
+    MIN(j.tanggal_mulai) AS tanggal_mulai,
+    MAX(j.tanggal_selesai) AS tanggal_selesai,
+    MIN(p.start_actual) AS start_actual,
+    MAX(p.start_actual) AS finish_actual
+FROM base b
+LEFT JOIN jadwal j
+ ON b.id_product=j.id_product
+AND b.trainset=j.trainset
+AND j.workshop='Tiron'
+LEFT JOIN latest_progress p
+ ON b.id_product=p.id_product
+AND b.trainset=p.trainset
+LEFT JOIN product_name_per_product pn
+ ON pn.id_product=b.id_product
+AND pn.trainset=b.trainset
+LEFT JOIN master_proses_sks pm
+ ON pm.id_product=p.id_product
+AND pm.sub_output=p.sub_output
+AND pm.sub_proses=p.sub_process
+LEFT JOIN master_proses_sks mp
+ ON mp.id_product=b.id_product
+AND (j.line IS NULL OR mp.line=j.line)
+LEFT JOIN last_process lp
+ ON lp.id_product=b.id_product
+GROUP BY
+ b.id_product,b.trainset,pn.product_name
+ORDER BY
+ COALESCE(MAX(j.product_name),pn.product_name,b.id_product),
+ b.id_product;
+    `);
+
+    const rows = extractRows(result);
+    return rows as ProductSummaryTiron[];
+  } catch (error) {
+    console.error("Failed to fetch product summary Tiron:", error);
+    return [];
+  }
+}
+
+export async function getProductPercentageTiron(
+  workshop?: string,
+  project?: string,
+  trainset?: string
+): Promise<ProductPercentageTiron[]> {
+  try {
+    const result = await db.execute(sql`
+
+WITH latest_progress AS (
+SELECT p.*
+FROM production_progress_protrack p
+INNER JOIN (
+SELECT id_product,trainset,process_name,MAX(start_actual) max_time
+FROM production_progress_protrack
+WHERE 1=1
+${workshop ? sql`AND workshop = ${workshop}` : sql``}
+${project ? sql`AND project_name = ${project}` : sql``}
+${trainset ? sql`AND trainset = ${trainset}` : sql``}
+GROUP BY id_product,trainset,process_name
+) latest
+ON latest.id_product=p.id_product
+AND latest.trainset=p.trainset
+AND latest.process_name=p.process_name
+AND latest.max_time=p.start_actual
+WHERE 1=1
+${workshop ? sql`AND p.workshop = ${workshop}` : sql``}
+${project ? sql`AND p.project_name = ${project}` : sql``}
+${trainset ? sql`AND p.trainset = ${trainset}` : sql``}
+)
+SELECT j.id_product,j.trainset,j.product_name,j.jumlah_tiapts,j.proses_produk,j.line,
+COALESCE(lp.status,'-') status,COALESCE(lp.percentage,0) percentage,
+COALESCE(lp.qty_progress,0) qty_progress,COALESCE(lp.total,0) total,
+COALESCE(lp.project_name,j.project) project,lp.start_actual,j.tanggal_mulai
+FROM jadwal j
+LEFT JOIN latest_progress lp
+ON lp.id_product=j.id_product
+AND lp.trainset=j.trainset
+AND lp.process_name=j.proses_produk
+WHERE j.workshop='Tiron'
+${project ? sql`AND j.project=${project}` : sql``}
+${trainset ? sql`AND j.trainset=${trainset}` : sql``}
+UNION ALL
+SELECT lp.id_product,lp.trainset,lp.product_name,NULL,lp.process_name,NULL,
+lp.status,lp.percentage,lp.qty_progress,lp.total,lp.project_name,
+lp.start_actual,NULL
+FROM latest_progress lp
+LEFT JOIN jadwal j
+ON j.id_product=lp.id_product
+AND j.trainset=lp.trainset
+AND j.proses_produk=lp.process_name
+AND j.workshop='Tiron'
+WHERE j.id_product IS NULL
+ORDER BY product_name,id_product,trainset,start_actual;
+
+    `);
+
+    const rows = extractRows(result);
+    console.log("Fetched product percentage Tiron:", rows);
+    return rows as ProductPercentageTiron[];
+  } catch (error) {
+    console.error("Failed to fetch product percentage Tiron:", error);
     return [];
   }
 }

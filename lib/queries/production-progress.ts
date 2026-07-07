@@ -523,6 +523,7 @@ export interface ProductStatusCard {
   id_perproduct: string | null;
   product_name: string | null;
   process_name: string | null;
+  sub_process: string | null;
   percentage: number | null;
   qty_progress: number | null;
   total: number | null;

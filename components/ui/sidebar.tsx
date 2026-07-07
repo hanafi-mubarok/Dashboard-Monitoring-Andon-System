@@ -244,10 +244,12 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
     if (pathname.startsWith('/penugasan-operator')) return 'operator-assignment';
     if (pathname.startsWith('/schedule/lantai-1')) return 'schedule-lantai1';
     if (pathname.startsWith('/schedule/lantai-2')) return 'schedule-lantai2';
+    if (pathname.startsWith('/schedule/tiron')) return 'schedule-tiron';
     if (pathname.startsWith('/schedule/sukosari')) return 'schedule-sukosari';
     if (pathname.startsWith('/schedule')) return 'schedule-lantai3';
     if (pathname.startsWith('/product/lantai-1')) return 'product-pengerjaan-lantai1';
     if (pathname.startsWith('/product/lantai-2')) return 'product-pengerjaan-lantai2';
+    if (pathname.startsWith('/product/tiron')) return 'product-pengerjaan-tiron';
     if (pathname.startsWith('/product/sukosari')) return 'product-pengerjaan-sukosari';
     if (pathname === '/product' || pathname.startsWith('/product/')) return 'product-pengerjaan-lantai3';
     if (pathname.startsWith('/product-tracking')) return 'product-tracking';
@@ -256,6 +258,7 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
     if (pathname.startsWith('/project')) return 'project-tambah-project';
     if (pathname.startsWith('/production-progress/lantai-1')) return 'production-lantai1';
     if (pathname.startsWith('/production-progress/lantai-2')) return 'production-lantai2';
+    if (pathname.startsWith('/production-progress/tiron')) return 'production-tiron';
     if (pathname.startsWith('/production-progress/sukosari')) return 'production-sukosari';
     if (pathname.startsWith('/production-progress')) return 'production-workstation';
     if (pathname.startsWith('/production/logs')) return 'production-log';
@@ -359,6 +362,11 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           id: 'schedule-sukosari',
           label: 'Workshop Sukosari',
           path: '/schedule/sukosari'
+        },
+        {
+          id: 'schedule-tiron',
+          label: 'Workshop Tiron',
+          path: '/schedule/tiron'
         }
       ]
     },
@@ -389,9 +397,14 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           path: '/product/lantai-1'
         },
         {
-              id: 'product-pengerjaan-sukosari',
-              label: 'Workshop Sukosari',
-              path: '/product/sukosari'
+          id: 'product-pengerjaan-sukosari',
+          label: 'Workshop Sukosari',
+          path: '/product/sukosari'
+        },
+        {
+          id: 'product-pengerjaan-tiron',
+          label: 'Workshop Tiron',
+          path: '/product/tiron'
         }
       ]
     },
@@ -434,11 +447,16 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           label: 'Lantai 1 Candisewu',
           path: '/production-progress/lantai-1'
         },
-            {
-              id: 'production-sukosari',
-              label: 'Workshop Sukosari',
-              path: '/production-progress/sukosari'
-            },
+        {
+          id: 'production-sukosari',
+          label: 'Workshop Sukosari',
+          path: '/production-progress/sukosari'
+        },
+        {
+          id: 'production-tiron',
+          label: 'Workshop Tiron',
+          path: '/production-progress/tiron'
+        },
       ]
     }
   ];

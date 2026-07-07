@@ -8,9 +8,10 @@ import { authUsers } from "@/lib/schema/auth";
 export const dynamic = "force-dynamic";
 
 type JadwalKey = {
-  id_product: string;
-  product_name: string;
-  trainset: number;
+  id_jadwal?: number;
+  id_product?: string;
+  product_name?: string;
+  trainset?: number;
 };
 
 type JadwalPayload = {
@@ -29,6 +30,7 @@ type JadwalPayload = {
   operator_assigned1: string | null;
   operator_assigned2: string | null;
   operator_assigned3: string | null;
+  operator_assigned4: string | null;
 };
 
 type JwtPayload = {
@@ -135,6 +137,9 @@ function normalizePayload(body: any): JadwalPayload | null {
   const operator_assigned3 = body?.operator_assigned3 && String(body.operator_assigned3).trim()
     ? String(body.operator_assigned3).trim()
     : null;
+  const operator_assigned4 = body?.operator_assigned4 && String(body.operator_assigned4).trim()
+    ? String(body.operator_assigned4).trim()
+    : null;
 
   return {
     id_product,
@@ -152,11 +157,16 @@ function normalizePayload(body: any): JadwalPayload | null {
     operator_assigned1,
     operator_assigned2,
     operator_assigned3,
+    operator_assigned4,
   };
 }
 
 function normalizeKey(body: any): JadwalKey | null {
   const key = body?.key || body;
+  // Prefer numeric id_jadwal if provided
+  const id_jadwal = key?.id_jadwal !== undefined ? Number(key.id_jadwal) : undefined;
+  if (id_jadwal && !Number.isNaN(id_jadwal)) return { id_jadwal };
+
   const id_product = String(key?.id_product || "").trim();
   const product_name = String(key?.product_name || "").trim();
   const trainset = Number(key?.trainset);
@@ -186,7 +196,8 @@ export async function GET(request: Request) {
   j.total_personil,
   j.operator_assigned1,
   j.operator_assigned2,
-  j.operator_assigned3,
+      j.operator_assigned3,
+      j.operator_assigned4,
   j.line,
   j.workshop,
   j.tanggal_mulai, 
@@ -198,9 +209,10 @@ export async function GET(request: Request) {
     j.jumlah_tiapts - COALESCE(p.jumlah_tunggu_qc,0),
     0
   ) AS jumlah_kekurangan,
-  CASE
-    WHEN 
-      COALESCE(p.jumlah_tunggu_qc,0) = j.jumlah_tiapts
+    SELECT 
+  j.id_jadwal,
+  j.id_product, 
+  j.product_name,
       AND j.trainset = p.trainset
     THEN 'Tepat Waktu'
     WHEN 
@@ -210,6 +222,7 @@ export async function GET(request: Request) {
     WHEN 
       CURRENT_DATE() BETWEEN 
         DATE_SUB(j.tanggal_selesai, INTERVAL 3 DAY)
+  j.operator_assigned4,
         AND j.tanggal_selesai
     THEN CONCAT('Kurang ', DATEDIFF(j.tanggal_selesai, CURRENT_DATE()), ' Hari')
     WHEN 
@@ -255,21 +268,23 @@ ORDER BY j.tanggal_mulai ASC;
       `);
     } else {
       result = await db.execute(sql`
-        SELECT 
-          j.id_product, 
+        SELECT
+          j.id_jadwal,
+          j.id_product,
           j.product_name,
           j.sub_output,
           j.proses_produk,
           j.project,
-          j.trainset, 
+          j.trainset,
           j.jumlah_tiapts,
           j.total_personil,
           j.operator_assigned1,
           j.operator_assigned2,
           j.operator_assigned3,
+          j.operator_assigned4,
           j.line,
           j.workshop,
-          j.tanggal_mulai, 
+          j.tanggal_mulai,
           j.tanggal_selesai,
           COALESCE(p.jumlah_tunggu_qc, 0) AS jumlah_tunggu_qc,
           COALESCE(p.jumlah_finish_good, 0) AS jumlah_finish_good,
@@ -298,31 +313,19 @@ ORDER BY j.tanggal_mulai ASC;
             THEN 'Waiting List'
             ELSE 'On Progress'
           END AS status
-        FROM jadwal AS j 
-        LEFT JOIN 
-        (
+        FROM jadwal AS j
+        LEFT JOIN (
           SELECT 
             id_product,
             trainset,
-            SUM(CASE 
-              WHEN status = 'Tunggu QC' THEN 1 
-              ELSE 0 
-            END) AS jumlah_tunggu_qc,
-            SUM(CASE 
-              WHEN status = 'Finish Good' THEN 1 
-              ELSE 0 
-            END) AS jumlah_finish_good
+            COUNT(DISTINCT CASE WHEN status = 'Tunggu QC' THEN id_perproduct END) AS jumlah_tunggu_qc,
+            COUNT(DISTINCT CASE WHEN status = 'Finish Good' THEN id_perproduct END) AS jumlah_finish_good,
+            MAX(start_actual) AS last_progress
           FROM ${progressTable}
-          WHERE 
-            MONTH(start_actual) = MONTH(CURRENT_DATE()) 
-            AND YEAR(start_actual) = YEAR(CURRENT_DATE())
+          WHERE MONTH(start_actual) = MONTH(CURRENT_DATE()) AND YEAR(start_actual) = YEAR(CURRENT_DATE())
           GROUP BY id_product, trainset
-        ) p 
-          ON j.id_product = p.id_product
-          AND j.trainset = p.trainset
-        LEFT JOIN ideal_time it
-          ON j.id_product = it.id_product
-          AND it.process_name = 'total_production_qc'
+        ) p ON j.id_product = p.id_product AND j.trainset = p.trainset
+        LEFT JOIN ideal_time it ON j.id_product = it.id_product AND it.process_name = 'total_production_qc'
         WHERE j.line = ${lineParam}
         ORDER BY j.tanggal_mulai ASC;
       `);
@@ -348,10 +351,10 @@ export async function POST(request: Request) {
     }
 
     await db.execute(sql`
-      INSERT INTO jadwal
-        (id_product, product_name, sub_output, proses_produk, project, trainset, jumlah_tiapts, total_personil, operator_assigned1, operator_assigned2, operator_assigned3, line, workshop, tanggal_mulai, tanggal_selesai)
+      INSERT INTO jadwal0
+        (id_product, product_name, sub_output, proses_produk, project, trainset, jumlah_tiapts, total_personil, operator_assigned1, operator_assigned2, operator_assigned3, operator_assigned4, line, workshop, tanggal_mulai, tanggal_selesai)
       VALUES
-        (${payload.id_product}, ${payload.product_name}, ${payload.sub_output}, ${payload.proses_produk}, ${payload.project}, ${payload.trainset}, ${payload.jumlah_tiapts}, ${payload.total_personil}, ${payload.operator_assigned1}, ${payload.operator_assigned2}, ${payload.operator_assigned3}, ${payload.line}, ${payload.workshop}, ${payload.tanggal_mulai}, ${payload.tanggal_selesai})
+        (${payload.id_product}, ${payload.product_name}, ${payload.sub_output}, ${payload.proses_produk}, ${payload.project}, ${payload.trainset}, ${payload.jumlah_tiapts}, ${payload.total_personil}, ${payload.operator_assigned1}, ${payload.operator_assigned2}, ${payload.operator_assigned3}, ${payload.operator_assigned4}, ${payload.line}, ${payload.workshop}, ${payload.tanggal_mulai}, ${payload.tanggal_selesai})
     `);
 
     return NextResponse.json({ success: true });
@@ -373,28 +376,54 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    await db.execute(sql`
-      UPDATE jadwal
-      SET
-        id_product = ${payload.id_product},
-        product_name = ${payload.product_name},
-        sub_output = ${payload.sub_output},
-        proses_produk = ${payload.proses_produk},
-        project = ${payload.project},
-        trainset = ${payload.trainset},
-        jumlah_tiapts = ${payload.jumlah_tiapts},
-        total_personil = ${payload.total_personil},
-        operator_assigned1 = ${payload.operator_assigned1},
-        operator_assigned2 = ${payload.operator_assigned2},
-        operator_assigned3 = ${payload.operator_assigned3},
-        line = ${payload.line},
-        workshop = ${payload.workshop},
-        tanggal_mulai = ${payload.tanggal_mulai},
-        tanggal_selesai = ${payload.tanggal_selesai}
-      WHERE id_product = ${key.id_product}
-        AND product_name = ${key.product_name}
-        AND trainset = ${key.trainset}
-    `);
+    // If id_jadwal provided, update by id; otherwise fallback to composite key for compatibility
+    if (key.id_jadwal && Number.isFinite(Number(key.id_jadwal))) {
+      await db.execute(sql`
+        UPDATE jadwal
+        SET
+          id_product = ${payload.id_product},
+          product_name = ${payload.product_name},
+          sub_output = ${payload.sub_output},
+          proses_produk = ${payload.proses_produk},
+          project = ${payload.project},
+          trainset = ${payload.trainset},
+          jumlah_tiapts = ${payload.jumlah_tiapts},
+          total_personil = ${payload.total_personil},
+          operator_assigned1 = ${payload.operator_assigned1},
+          operator_assigned2 = ${payload.operator_assigned2},
+          operator_assigned3 = ${payload.operator_assigned3},
+          operator_assigned4 = ${payload.operator_assigned4},
+          line = ${payload.line},
+          workshop = ${payload.workshop},
+          tanggal_mulai = ${payload.tanggal_mulai},
+          tanggal_selesai = ${payload.tanggal_selesai}
+        WHERE id_jadwal = ${Number(key.id_jadwal)}
+      `);
+    } else {
+      await db.execute(sql`
+        UPDATE jadwal
+        SET
+          id_product = ${payload.id_product},
+          product_name = ${payload.product_name},
+          sub_output = ${payload.sub_output},
+          proses_produk = ${payload.proses_produk},
+          project = ${payload.project},
+          trainset = ${payload.trainset},
+          jumlah_tiapts = ${payload.jumlah_tiapts},
+          total_personil = ${payload.total_personil},
+          operator_assigned1 = ${payload.operator_assigned1},
+          operator_assigned2 = ${payload.operator_assigned2},
+          operator_assigned3 = ${payload.operator_assigned3},
+          operator_assigned4 = ${payload.operator_assigned4},
+          line = ${payload.line},
+          workshop = ${payload.workshop},
+          tanggal_mulai = ${payload.tanggal_mulai},
+          tanggal_selesai = ${payload.tanggal_selesai}
+        WHERE id_product = ${key.id_product}
+          AND product_name = ${key.product_name}
+          AND trainset = ${key.trainset}
+      `);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -414,12 +443,19 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
-    await db.execute(sql`
-      DELETE FROM jadwal
-      WHERE id_product = ${key.id_product}
-        AND product_name = ${key.product_name}
-        AND trainset = ${key.trainset}
-    `);
+    if (key.id_jadwal && Number.isFinite(Number(key.id_jadwal))) {
+      await db.execute(sql`
+        DELETE FROM jadwal
+        WHERE id_jadwal = ${Number(key.id_jadwal)}
+      `);
+    } else {
+      await db.execute(sql`
+        DELETE FROM jadwal
+        WHERE id_product = ${key.id_product}
+          AND product_name = ${key.product_name}
+          AND trainset = ${key.trainset}
+      `);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

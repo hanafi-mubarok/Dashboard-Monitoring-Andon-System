@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JadwalRow, StatisticRow } from "@/lib/queries/jadwal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Filter, Search, Plus, Save, X, Pencil, Trash2, Layers, Eye, EyeOff, Target, Clock, CheckCircle2, AlertTriangle, Activity, Hourglass, AlertCircle, CheckCheck, Package, BookCheck, ClipboardList, Timer } from "lucide-react";
 
 type JadwalKey = {
-  id_product: string;
-  product_name: string;
-  trainset: number;
+  id_jadwal: number;
 };
 
 type SortConfig = {
@@ -381,6 +379,7 @@ export default function JadwalClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [monthYearFilter, setMonthYearFilter] = useState(getCurrentMonthYear());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [createForm, setCreateForm] = useState<JadwalForm>(emptyForm);
   const [editingKey, setEditingKey] = useState<JadwalKey | null>(null);
   const [editForm, setEditForm] = useState<JadwalForm>(emptyForm);
@@ -603,6 +602,8 @@ export default function JadwalClient({
       alert("Lengkapi ID Product, Product Name, dan Trainset.");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       const payload = buildPayload(createForm);
@@ -629,6 +630,7 @@ export default function JadwalClient({
       setShowModal(true);
       setTimeout(() => setShowModal(false), 3000);
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -672,11 +674,8 @@ export default function JadwalClient({
       return;
     }
 
-    if (!row.id_product || !row.product_name || row.trainset === null) return;
-    if (editingKey?.id_product === row.id_product && 
-        editingKey?.product_name === row.product_name && 
-        editingKey?.trainset === row.trainset && 
-        showFormCard) {
+    if (!row.id_jadwal) return;
+    if (editingKey?.id_jadwal === row.id_jadwal && showFormCard) {
       setEditingKey(null);
       setEditForm(emptyForm);
       setOriginalEditForm(emptyForm);
@@ -695,11 +694,7 @@ export default function JadwalClient({
       tanggal_mulai: toDateInputValue(row.tanggal_mulai),
       tanggal_selesai: toDateInputValue(row.tanggal_selesai),
     };
-    setEditingKey({
-      id_product: row.id_product,
-      product_name: row.product_name,
-      trainset: Number(row.trainset),
-    });
+    setEditingKey({ id_jadwal: Number(row.id_jadwal) });
     setEditForm(editData);
     setOriginalEditForm(editData);
     setShowFormCard(true);
@@ -723,6 +718,8 @@ export default function JadwalClient({
       alert("Lengkapi semua field yang diperlukan (*)");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       const payload = {
@@ -753,6 +750,7 @@ export default function JadwalClient({
       setShowModal(true);
       setTimeout(() => setShowModal(false), 3000);
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -763,18 +761,14 @@ export default function JadwalClient({
       return;
     }
 
-    if (!row.id_product || !row.product_name || row.trainset === null) return;
+    if (!row.id_jadwal) return;
     const confirmed = window.confirm("Hapus data jadwal ini?");
     if (!confirmed) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
-      const payload = {
-        key: {
-          id_product: row.id_product,
-          product_name: row.product_name,
-          trainset: Number(row.trainset),
-        },
-      };
+      const payload = { key: { id_jadwal: Number(row.id_jadwal) } };
       const response = await fetch("/api/jadwal", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -786,6 +780,7 @@ export default function JadwalClient({
       console.error(error);
       alert("Gagal menghapus data jadwal.");
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -1437,7 +1432,7 @@ export default function JadwalClient({
                 <X className="w-4 h-4" />
                 Batal
               </button>
-              <button onClick={editingKey ? handleUpdate : handleCreate} disabled={isSubmitting || !isValidForm(currentForm)} className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${editingKey ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 disabled:hover:bg-amber-500/20" : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 disabled:hover:bg-emerald-500/20"}`}>
+              <button type="button" onClick={editingKey ? handleUpdate : handleCreate} disabled={isSubmitting || !isValidForm(currentForm)} className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${editingKey ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 disabled:hover:bg-amber-500/20" : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 disabled:hover:bg-emerald-500/20"}`}>
                 <Save className="w-4 h-4" />
                 {editingKey ? "Update" : "Simpan"}
               </button>
@@ -1453,7 +1448,7 @@ export default function JadwalClient({
           <input type="text" placeholder="Cari ID Product atau Product Name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all" />
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={toggleCreateForm} disabled={!canManageSchedule} className="flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-4 py-2.5 rounded-lg border border-emerald-500/40 hover:bg-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/20">
+          <button type="button" onClick={toggleCreateForm} disabled={!canManageSchedule} className="flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-4 py-2.5 rounded-lg border border-emerald-500/40 hover:bg-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/20">
             <Plus className="w-4 h-4" />
             Tambah Data
           </button>

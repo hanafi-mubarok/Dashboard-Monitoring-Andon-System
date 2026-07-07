@@ -10,8 +10,10 @@ function getProductionProgressTableByLine(line?: string) {
 }
 
 export interface JadwalRow {
-  id_product: string | null;
-  product_name: string | null;
+    id_jadwal?: number | null;
+    id_product: string | null;
+    product_name: string | null;
+    operator_assigned4?: string | null;
     proses_produk?: string | null;
     process_name?: string | null;
   project: string | null;

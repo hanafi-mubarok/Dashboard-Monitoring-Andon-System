@@ -170,9 +170,11 @@ export default function TimelineContent({
   showWorkstationTimeline = true,
 }: TimelineContentProps) {
   const normalizedLine = (apiLine ?? "").trim().toLowerCase();
+  const normalizedWorkshop = workshop?.trim().toLowerCase() ?? "";
   const isLantai12 = normalizedLine === "lantai 1" || normalizedLine === "lantai 2";
   const isLantai3 = normalizedLine === "lantai 3";
-  const hideKanbanEstimateTarget = isLantai12;
+  const isWorkshopPage = normalizedWorkshop === "sukosari" || normalizedWorkshop === "tiron";
+  const hideKanbanEstimateTarget = isLantai12 || isWorkshopPage;
 
   const [stats, setStats] = useState<ProductionStats>(initialStats);
   const [workstations, setWorkstations] = useState<WorkstationStats[]>(initialWorkstations);
@@ -528,9 +530,9 @@ export default function TimelineContent({
                                 {showOddSide ? (
                                   <div className="h-14 text-[10px] text-gray-300 leading-tight text-center w-24">
                                     {oddDisplay?.wsData?.presentase ? <div className="text-emerald-400 font-semibold truncate">{`${oddDisplay.wsData.presentase}%`}</div> : null}
-                                    {oddDisplay?.wsData?.current_product_name ? <div className="truncate font-semibold">{oddDisplay.wsData.current_product_name}</div> : null}
-                                    {oddDisplay?.wsData?.current_operator_actual_name ? <div className="truncate">{oddDisplay.wsData.current_operator_actual_name}</div> : null}
-                                    {oddDisplay?.status ? <div className="truncate text-gray-400">{oddDisplay.status}</div> : null}
+                                    {oddDisplay?.wsData?.current_product_name ? <div className="truncate font-semibold" title={oddDisplay.wsData.current_product_name}>{oddDisplay.wsData.current_product_name}</div> : null}
+                                    {oddDisplay?.wsData?.current_operator_actual_name ? <div className="truncate" title={oddDisplay.wsData.current_operator_actual_name}>{oddDisplay.wsData.current_operator_actual_name}</div> : null}
+                                    {oddDisplay?.status ? <div className="truncate text-gray-400" title={oddDisplay.status}>{oddDisplay.status}</div> : null}
                                     {oddDisplay?.showElapsed ? (
                                       <Elapsed since={oddDisplay.info?.at} className={`text-[10px] truncate ${oddDisplay.variant.bg.includes('blue') ? 'text-blue-400' : 'text-gray-400'}`} />
                                     ) : oddDisplay?.showWaitingElapsed && oddDisplay.info?.at ? (
@@ -547,9 +549,9 @@ export default function TimelineContent({
 
                                 {showEvenSide ? (
                                   <div className="h-14 mt-0.5 text-[10px] text-gray-300 leading-tight text-center w-24">
-                                    {evenDisplay?.wsData?.current_product_name ? <div className="truncate font-semibold">{evenDisplay.wsData.current_product_name}</div> : null}
-                                    {evenDisplay?.wsData?.current_operator_actual_name ? <div className="truncate">{evenDisplay.wsData.current_operator_actual_name}</div> : null}
-                                    {evenDisplay?.status ? <div className="truncate text-gray-400">{evenDisplay.status}</div> : null}
+                                    {evenDisplay?.wsData?.current_product_name ? <div className="truncate font-semibold" title={evenDisplay.wsData.current_product_name}>{evenDisplay.wsData.current_product_name}</div> : null}
+                                    {evenDisplay?.wsData?.current_operator_actual_name ? <div className="truncate" title={evenDisplay.wsData.current_operator_actual_name}>{evenDisplay.wsData.current_operator_actual_name}</div> : null}
+                                    {evenDisplay?.status ? <div className="truncate text-gray-400" title={evenDisplay.status}>{evenDisplay.status}</div> : null}
                                     {evenDisplay?.showElapsed ? (
                                       <Elapsed since={evenDisplay.info?.at} className={`text-[10px] truncate ${evenDisplay.variant.bg.includes('blue') ? 'text-blue-400' : 'text-gray-400'}`} />
                                     ) : evenDisplay?.showWaitingElapsed && evenDisplay.info?.at ? (
@@ -618,9 +620,9 @@ export default function TimelineContent({
 
                             {hasInfo ? (
                               <div className="h-14 mt-0.5 text-[10px] text-gray-300 leading-tight text-center w-24">
-                                {ws.product_name ? <div className="truncate font-semibold">{ws.product_name}</div> : null}
-                                {ws.active_operator ? <div className="truncate">{ws.active_operator}</div> : null}
-                                {ws.current_status ? <div className="truncate text-gray-400">{ws.current_status}</div> : null}
+                                {ws.product_name ? <div className="truncate font-semibold" title={ws.product_name}>{ws.product_name}</div> : null}
+                                {ws.active_operator ? <div className="truncate" title={ws.active_operator}>{ws.active_operator}</div> : null}
+                                {ws.current_status ? <div className="truncate text-gray-400" title={ws.current_status}>{ws.current_status}</div> : null}
                                 {showElapsed ? (
                                   <Elapsed
                                     since={info?.at}
@@ -731,9 +733,9 @@ export default function TimelineContent({
                         <CardContent className="px-3 py-1">
                           <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                             <div className="space-y-0.5 min-w-0 leading-tight">
-                              <div className="text-sm font-semibold text-white truncate">{product.product_name || "-"}</div>
-                              <div className="text-xs text-gray-300 truncate">Trainset {product.trainset ?? "-"}</div>
-                              <div className="text-xs text-gray-400 truncate">
+                              <div className="text-sm font-semibold text-white truncate" title={product.product_name || "-"}>{product.product_name || "-"}</div>
+                              <div className="text-xs text-gray-300 truncate" title={`Trainset ${product.trainset ?? "-"}`}>Trainset {product.trainset ?? "-"}</div>
+                              <div className="text-xs text-gray-400 truncate" title={product.proses_produk || "-"}>
                                 {product.proses_produk ?? "-"}
                               </div>
                               <Badge className={`border-0 text-xs font-semibold ${statusBg} text-white`}>
@@ -797,9 +799,9 @@ export default function TimelineContent({
                         <CardContent className="px-3 py-1">
                           <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                             <div className="space-y-0.5 min-w-0 leading-tight">
-                              <div className="text-sm font-semibold text-white truncate">{card.product_name || "-"}</div>
-                              <div className="text-xs text-gray-300 truncate">{card.id_perproduct || card.id_product || "-"}</div>
-                              <div className="text-xs text-gray-400 truncate">{card.operator_actual_name || "-"}</div>
+                              <div className="text-sm font-semibold text-white truncate" title={card.product_name || "-"}>{card.product_name || "-"}</div>
+                              <div className="text-xs text-gray-300 truncate" title={card.id_perproduct || card.id_product || "-"}>{card.id_perproduct || card.id_product || "-"}</div>
+                              <div className="text-xs text-gray-400 truncate" title={card.operator_actual_name || "-"}>{card.operator_actual_name || "-"}</div>
                               {isWaiting && (
                                 <Badge className={`${statusColor.bg} ${statusColor.border} ${statusColor.text} border text-xs font-semibold`}>
                                   ⏸ {card.status}
@@ -810,7 +812,9 @@ export default function TimelineContent({
                               {hideKanbanEstimateTarget ? (
                                 <>
                                   <div className="text-xs text-gray-200 font-bold">{formatProgressCount(card)}</div>
-                                  <div className="text-xs text-gray-300 whitespace-nowrap">{card.process_name || "-"}</div>
+                                  <div className="text-xs text-gray-300 truncate max-w-[120px]" title={card.sub_process || card.process_name || "-"}>{card.sub_process || card.process_name || "-"}</div>
+                                  <div className="text-xs text-gray-400 mt-0.5">Selesai</div>
+                                  <div className="text-xs text-gray-300 whitespace-nowrap">{formatDateTime(card.estimated_finish || card.start_actual)}</div>
                                   <div className="text-xs text-gray-300 mt-0.5">{formatPercentage(card.percentage)}</div>
                                 </>
                               ) : (
@@ -875,16 +879,16 @@ export default function TimelineContent({
                         <CardContent className="px-3 py-1">
                           <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                             <div className="space-y-0.5 min-w-0 leading-tight">
-                              <div className="text-sm font-semibold text-white truncate">{card.product_name || "-"}</div>
-                              <div className="text-xs text-gray-300 truncate">{card.id_perproduct || card.id_product || "-"}</div>
-                              <div className="text-xs text-gray-400 truncate">{card.operator_actual_name || "-"}</div>
+                              <div className="text-sm font-semibold text-white truncate" title={card.product_name || "-"}>{card.product_name || "-"}</div>
+                              <div className="text-xs text-gray-300 truncate" title={card.id_perproduct || card.id_product || "-"}>{card.id_perproduct || card.id_product || "-"}</div>
+                              <div className="text-xs text-gray-400 truncate" title={card.operator_actual_name || "-"}>{card.operator_actual_name || "-"}</div>
                               <Badge className="bg-blue-600 text-white border-0 text-xs">{card.status || "Tunggu QC"}</Badge>
                             </div>
                             <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
                               {hideKanbanEstimateTarget ? (
                                 <>
                                   <div className="text-xs text-gray-200 font-bold">{formatProgressCount(card)}</div>
-                                  <div className="text-xs text-gray-300 whitespace-nowrap">{card.process_name || "-"}</div>
+                                  <div className="text-xs text-gray-300 truncate max-w-[120px]" title={card.sub_process || card.process_name || "-"}>{card.sub_process || card.process_name || "-"}</div>
                                 </>
                               ) : (
                                 <>
@@ -954,16 +958,16 @@ export default function TimelineContent({
                        <CardContent className="px-3 py-1">
                           <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                           <div className="space-y-0.5 min-w-0 leading-tight">
-                              <div className="text-sm font-semibold text-white truncate">{card.product_name || "-"}</div>
-                              <div className="text-xs text-gray-300 truncate">{card.id_perproduct || card.id_product || "-"}</div>
-                              <div className="text-xs text-gray-400 truncate">{card.operator_actual_name || "-"}</div>
+                              <div className="text-sm font-semibold text-white truncate" title={card.product_name || "-"}>{card.product_name || "-"}</div>
+                              <div className="text-xs text-gray-300 truncate" title={card.id_perproduct || card.id_product || "-"}>{card.id_perproduct || card.id_product || "-"}</div>
+                              <div className="text-xs text-gray-400 truncate" title={card.operator_actual_name || "-"}>{card.operator_actual_name || "-"}</div>
                               <Badge className="bg-emerald-600 text-white border-0 text-xs">Finish Good</Badge>
                             </div>
                             <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
                               {hideKanbanEstimateTarget ? (
                                 <>
                                   <div className="text-xs text-gray-200 font-bold">{formatProgressCount(card)}</div>
-                                  <div className="text-xs text-gray-300 whitespace-nowrap">{card.process_name || "-"}</div>
+                                  <div className="text-xs text-gray-300 truncate max-w-[120px]" title={card.sub_process || card.process_name || "-"}>{card.sub_process || card.process_name || "-"}</div>
                                 </>
                               ) : null}
                               <div className="text-xs text-gray-400 mt-0.5">Selesai</div>
@@ -1024,7 +1028,7 @@ export default function TimelineContent({
 
               {/* Nama Operator */}
               <div className="flex-1 min-w-0">
-                <div className="text-white font-semibold text-sm truncate leading-tight">
+                <div className="text-white font-semibold text-sm truncate leading-tight" title={op.operator_actual_name || "-"}>
                   {op.operator_actual_name || "-"}
                 </div>
               </div>
@@ -1039,7 +1043,7 @@ export default function TimelineContent({
             {/* ================= PRODUCT INFO ================= */}
             <div className="flex items-end justify-between mt-0">
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-white truncate leading-tight">
+                <div className="text-sm font-semibold text-white truncate leading-tight" title={op.latest_product_name || "-"}>
                   {op.latest_product_name || "-"}
                 </div>
               </div>
@@ -1048,7 +1052,7 @@ export default function TimelineContent({
               </div>
             </div>
 
-            <div className="text-xs text-gray-400 truncate leading-tight">
+            <div className="text-xs text-gray-400 truncate leading-tight" title={op.latest_id_perproduct || "-"}>
               {op.latest_id_perproduct || "-"}
             </div>
 
@@ -1260,7 +1264,7 @@ export default function TimelineContent({
 
         {/* Production Progress Detailed Table */}
         <div className="bg-gray-900/60 border border-gray-700/60 backdrop-blur-sm rounded-lg p-6">
-          <ProductionProgressTable data={recent} />
+          <ProductionProgressTable data={recent} mode={isWorkshopPage ? 'protrack' : 'default'} />
         </div>
       </div>
     </>
