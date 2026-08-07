@@ -274,7 +274,11 @@ const result = await db.execute(sql`
     (sm.qty * COALESCE(mk.harga_satuan, 0)) AS total_harga
 
   FROM stok_material sm
-  LEFT JOIN master_komat mk
+  LEFT JOIN (
+    SELECT komat, MAX(harga_satuan) AS harga_satuan
+    FROM master_komat
+    GROUP BY komat
+  ) mk
     ON sm.komat = mk.komat
 
   ${whereSql}

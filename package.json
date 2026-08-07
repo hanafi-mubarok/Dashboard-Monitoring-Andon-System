@@ -23,6 +23,7 @@
     "chartjs-plugin-datalabels": "^2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.561.0",

@@ -2,7 +2,7 @@ import ModernSidebar from "@/components/ui/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import PengadaanDashboard from "@/components/material/PengadaanDashboard";
 import MaterialRequestPoster from "@/components/material/MaterialRequestPoster";
-import { getPengadaanPercentage, getAverageLeadTime, getTopProjects, getDevQty, getKanbanPR, getKanbanPO, getVendorPerformance } from "@/lib/queries/material_po";
+import { getPengadaanPercentage, getAverageLeadTime, getTopProjects, getDevQty, getKanbanPR, getKanbanPO, getKanbanGR, getVendorPerformance } from "@/lib/queries/material_po";
 import { getKanbanReqPR } from "@/lib/queries/request_pr";
 
 function formatDateOnly(value?: Date | string | null) {
@@ -20,7 +20,7 @@ function getDefaultDateRangeLabel() {
 
 export default async function PengadaanMaterialPage() {
   // ambil semua data dari server secara parallel
-  const [percentageRows, leadTimeRows, topProjectsRows, devQtyRows, kanbanPRRows, kanbanReqPRRows, kanbanPORows, vendorPerformanceRows] = await Promise.all([
+  const [percentageRows, leadTimeRows, topProjectsRows, devQtyRows, kanbanPRRows, kanbanReqPRRows, kanbanPORows, kanbanGRRows, vendorPerformanceRows] = await Promise.all([
     getPengadaanPercentage(),
     getAverageLeadTime(),
     getTopProjects(),
@@ -28,6 +28,7 @@ export default async function PengadaanMaterialPage() {
     getKanbanPR(),
     getKanbanReqPR(),
     getKanbanPO(),
+    getKanbanGR(),
     getVendorPerformance(),
   ]);
 
@@ -62,6 +63,7 @@ export default async function PengadaanMaterialPage() {
     kanban_pr: Array.isArray(kanbanPRRows) ? kanbanPRRows : [],
     kanban_req_pr: Array.isArray(kanbanReqPRRows) ? kanbanReqPRRows : [],
     kanban_po: Array.isArray(kanbanPORows) ? kanbanPORows : [],
+    kanban_gr: Array.isArray(kanbanGRRows) ? kanbanGRRows : [],
     // deviation qty data
     dev_qty_pr_po: Array.isArray(devQtyRows) && devQtyRows.length > 0 ? devQtyRows[0]?.percentage_qty_pr_po ?? 0 : 0,
     dev_qty_po_gr: Array.isArray(devQtyRows) && devQtyRows.length > 0 ? devQtyRows[0]?.percentage_qty_po_gr ?? 0 : 0,

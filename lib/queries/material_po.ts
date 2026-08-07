@@ -47,23 +47,26 @@ export interface dev_qty {
 }
 
 export interface kanban_pr {
-    no_pr: string;
-    account_req: number;
+    //no_pr: string;
+    //account_req: number;
     request_date: string;
     wbs: string;
-    eta: string;
+ //   eta: string;
     project_code: string;
+    total_pr: number;
     item_pr_diproses: number;
     total_item_pr: number;
     percentage_item_pr: number;
     avg_lead_time_pr: number;
+    selisih_item_pr: number;
 }
 
 export interface kanban_po {
-    no_po: string;
-    vendor_name: string;
+    //no_po: string;
+    //vendor_name: string;
     wbs: string;
     project_code: string;
+    total_po: number;
     po_date: string;
     item_po_diproses: number;
     total_item_po: number;
@@ -72,8 +75,26 @@ export interface kanban_po {
     avg_lead_time_po: number;
 }
 
+export interface kanban_gr {
+    //no_po: string;
+    //vendor_name: string;
+    wbs: string;
+    project_code: string;
+    total_gr: number;
+    item_gr_diproses: number;
+    total_item_gr: number;
+    percentage_item_gr: number;
+    arrival_date: string;
+    avg_lead_time_gr: number;
+    selisih_item_gr: number;
+}
+
+
+
 export interface material_pr {
     no_item_pr: number;
+    no_pr: string;
+    komat: string;
     material_name: string;
     qty_requested: number;
     qty_ordered: number;
@@ -84,6 +105,8 @@ export interface material_pr {
 
 export interface material_po {
     no_item_po: number;
+    no_po: string;
+    komat: string;
     material_name: string;
     qty_requested: number;
     qty_ordered: number;
@@ -91,6 +114,19 @@ export interface material_po {
     satuan: string;
     status: string;
 }
+
+export interface material_gr {
+    no_item_po: number;
+    no_po: string;
+    komat: string;
+    material_name: string;
+    qty_requested: number;
+    qty_ordered: number;
+    qty_arrived: number;
+    satuan: string;
+    status: string;
+}
+
 
 export interface tabel_material {
     account_req: number;
@@ -734,38 +770,16 @@ export async function getKanbanPR(
   try {
     const result = await db.execute(sql`
 SELECT
-    mp.no_pr,
+    COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel') AS project_code,
 
-    MAX(mp.account_req) AS account_req,
+    /* 1 Project = 1 WBS */
+    MAX(mp.wbs) AS wbs,
 
-    MIN(mp.request_date) AS request_date,
+    /* Total PR */
+    COUNT(DISTINCT mp.no_pr) AS total_pr,
 
-    /* WBS mayoritas dalam 1 no_pr */
-    (
-        SELECT t.wbs
-        FROM material_po t
-        WHERE t.no_pr = mp.no_pr
-          AND t.wbs IS NOT NULL
-          AND t.wbs <> ''
-        GROUP BY t.wbs
-        ORDER BY COUNT(*) DESC, t.wbs
-        LIMIT 1
-    ) AS wbs,
-
-    /* Estimasi kedatangan terakhir */
-    MAX(mp.est_incoming_date) AS eta,
-
-    /* Project Code mayoritas dalam 1 no_pr */
-    (
-        SELECT t.project_code
-        FROM material_po t
-        WHERE t.no_pr = mp.no_pr
-          AND t.project_code IS NOT NULL
-          AND t.project_code <> ''
-        GROUP BY t.project_code
-        ORDER BY COUNT(*) DESC, t.project_code
-        LIMIT 1
-    ) AS project_code,
+    /* Request terakhir */
+    MAX(mp.request_date) AS request_date,
 
     /* Jumlah item yang masih Proses PO */
     SUM(
@@ -775,41 +789,79 @@ SELECT
         END
     ) AS item_pr_diproses,
 
-    /* Total item PR */
-    MAX(mp.no_item_pr) AS total_item_pr,
+    /* Total item selain dibatalkan */
+    SUM(
+        CASE
+            WHEN mp.status <> 'Dibatalkan' THEN 1
+            ELSE 0
+        END
+    ) AS total_item_pr,
 
-    /* Persentase item yang diproses */
-ROUND(
+    /* Selisih item */
+    SUM(
+        CASE
+            WHEN mp.status <> 'Dibatalkan' THEN 1
+            ELSE 0
+        END
+    )
+    -
     SUM(
         CASE
             WHEN mp.status = 'Proses PO' THEN 1
             ELSE 0
         END
-    ) * 100.0 /
-    NULLIF(MAX(mp.no_item_pr), 0),
-    0
-) AS percentage_item_pr,
+    ) AS selisih_item_pr,
 
-ROUND(
-    AVG(mp.lead_time),
-    0
-) AS avg_lead_time_pr
+    /* Persentase item diproses */
+    ROUND(
+        SUM(
+            CASE
+                WHEN mp.status = 'Proses PO' THEN 1
+                ELSE 0
+            END
+        ) * 100.0 /
+        NULLIF(
+            SUM(
+                CASE
+                    WHEN mp.status <> 'Dibatalkan' THEN 1
+                    ELSE 0
+                END
+            ),
+            0
+        ),
+        0
+    ) AS percentage_item_pr,
+
+    /* Average Lead Time */
+    ROUND(
+        AVG(mp.lead_time),
+        0
+    ) AS avg_lead_time_pr
 
 FROM material_po mp
 
 WHERE mp.no_pr IS NOT NULL
-  AND YEAR(mp.request_date) = 2026
-  ${days ? sql`AND mp.request_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)` : sql``}
-  ${projectCodes && projectCodes.length > 0
-    ? sql`
-      AND mp.project_code IN (
+
+${days
+  ? sql`
+      AND mp.request_date >= DATE_SUB(
+          CURDATE(),
+          INTERVAL ${Number(days)} DAY
+      )
+    `
+  : sql``}
+
+${projectCodes && projectCodes.length > 0
+  ? sql`
+      AND COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel')
+      IN (
         ${sql.join(
           projectCodes.map((p) => sql`${p}`),
           sql`, `
         )}
       )
     `
-    : sql``}
+  : sql``}
 
 ${months && months.length > 0
   ? sql`
@@ -822,15 +874,17 @@ ${months && months.length > 0
     `
   : sql``}
 
-GROUP BY mp.no_pr
+GROUP BY COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel')
 
-ORDER BY mp.no_pr DESC
+ORDER BY MAX(mp.request_date) DESC
 `);
 
     const rows = Array.isArray(result[0]) ? result[0] : result;
+
     return rows as kanban_pr[];
+
   } catch (error) {
-    console.error("Gagal mengambil data material:", error);
+    console.error("Gagal mengambil data Kanban PR:", error);
     return [];
   }
 }
@@ -843,46 +897,16 @@ export async function getKanbanPO(
   try {
     const result = await db.execute(sql`
 SELECT
-    mp.no_po,
+    COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel') AS project_code,
 
-    /* Vendor mayoritas dalam 1 PO */
-    (
-        SELECT t.vendor_name
-        FROM material_po t
-        WHERE t.no_po = mp.no_po
-          AND t.vendor_name IS NOT NULL
-          AND t.vendor_name <> ''
-        GROUP BY t.vendor_name
-        ORDER BY COUNT(*) DESC, t.vendor_name
-        LIMIT 1
-    ) AS vendor_name,
+    /* WBS 1 project = 1 WBS */
+    MAX(mp.wbs) AS wbs,
 
-    /* WBS mayoritas dalam 1 PO */
-    (
-        SELECT t.wbs
-        FROM material_po t
-        WHERE t.no_po = mp.no_po
-          AND t.wbs IS NOT NULL
-          AND t.wbs <> ''
-        GROUP BY t.wbs
-        ORDER BY COUNT(*) DESC, t.wbs
-        LIMIT 1
-    ) AS wbs,
-
-    /* Project Code mayoritas dalam 1 PO */
-    (
-        SELECT t.project_code
-        FROM material_po t
-        WHERE t.no_po = mp.no_po
-          AND t.project_code IS NOT NULL
-          AND t.project_code <> ''
-        GROUP BY t.project_code
-        ORDER BY COUNT(*) DESC, t.project_code
-        LIMIT 1
-    ) AS project_code,
+    /* Total PO dalam project */
+    COUNT(DISTINCT mp.no_po) AS total_po,
 
     /* Tanggal PO pertama */
-    MIN(mp.po_date) AS po_date,
+    MAX(mp.po_date) AS po_date,
 
     /* Tanggal kedatangan terakhir */
     MAX(mp.arrival_date) AS arrival_date,
@@ -892,19 +916,16 @@ SELECT
         AVG(
             CASE
                 WHEN mp.arrival_date IS NULL
-                THEN DATEDIFF(CURDATE(), mp.po_date)
-
+                    THEN DATEDIFF(CURDATE(), mp.po_date)
                 WHEN mp.arrival_date IS NOT NULL
                      AND mp.lead_time IS NOT NULL
-                THEN mp.lead_time
-
-                ELSE NULL
+                    THEN mp.lead_time
             END
         ),
         0
     ) AS avg_lead_time_po,
 
-    /* Jumlah item yang sudah diterima */
+    /* Jumlah item diterima */
     SUM(
         CASE
             WHEN mp.status = 'Diterima' THEN 1
@@ -912,68 +933,64 @@ SELECT
         END
     ) AS item_po_diproses,
 
-    /* Total item dalam PO */
-    SUM(
-    CASE
-        WHEN mp.status <> 'Dibatalkan' THEN 1
-        ELSE 0
-    END
-) AS total_item_po,
-
-    /* Persentase item yang diterima */
-ROUND(
+    /* Total item selain dibatalkan */
     SUM(
         CASE
-            WHEN mp.status = 'Diterima' THEN 1
+            WHEN mp.status <> 'Dibatalkan' THEN 1
             ELSE 0
         END
-    ) * 100.0 /
-    NULLIF(
+    ) AS total_item_po,
+
+    /* Persentase item diterima */
+    ROUND(
         SUM(
             CASE
-                WHEN mp.status <> 'Dibatalkan' THEN 1
+                WHEN mp.status = 'Diterima' THEN 1
                 ELSE 0
             END
+        ) * 100.0 /
+        NULLIF(
+            SUM(
+                CASE
+                    WHEN mp.status <> 'Dibatalkan' THEN 1
+                    ELSE 0
+                END
+            ),
+            0
         ),
         0
-    ),
-    0
-) AS percentage_item_po
+    ) AS percentage_item_po
 
 FROM material_po mp
 
 WHERE mp.no_po IS NOT NULL
-  AND mp.po_date >= '2026-01-01'
-  AND mp.po_date < '2027-01-01'
-  ${days ? sql`AND (
+
+${days ? sql`
+AND (
     mp.po_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)
-    OR mp.arrival_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)
-  )` : sql``}
-  ${projectCodes && projectCodes.length > 0
-    ? sql`
-      AND mp.project_code IN (
-        ${sql.join(
-          projectCodes.map((p) => sql`${p}`),
-          sql`, `
-        )}
-      )
-    `
-    : sql``}
+
+)
+` : sql``}
+
+${projectCodes && projectCodes.length > 0
+  ? sql`
+AND COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel') IN (
+    ${sql.join(projectCodes.map(p => sql`${p}`), sql`, `)}
+)
+`
+  : sql``}
 
 ${months && months.length > 0
   ? sql`
-      AND MONTH(mp.request_date) IN (
-        ${sql.join(
-          months.map((m) => sql`${Number(m)}`),
-          sql`, `
-        )}
-      )
-    `
+AND MONTH(mp.po_date) IN (
+    ${sql.join(months.map(m => sql`${Number(m)}`), sql`, `)}
+)
+`
   : sql``}
 
-GROUP BY mp.no_po
+GROUP BY COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel')
 
-ORDER BY mp.no_po DESC
+ORDER BY MAX(mp.po_date) DESC;
 `);
 
     const rows = Array.isArray(result[0]) ? result[0] : result;
@@ -984,30 +1001,172 @@ ORDER BY mp.no_po DESC
   }
 }
 
-
-export async function getDetailMaterialPOByPO(
-  no_po?: string,
+export async function getKanbanGR(
+  months?: string[],
   projectCodes?: string[],
   days?: number
-): Promise<material_po[]> {
+): Promise<kanban_gr[]> {
   try {
     const result = await db.execute(sql`
-SELECT no_item_po, material_name, qty_requested, qty_ordered, qty_arrived, satuan, status 
-FROM material_po 
-WHERE no_po = ${no_po}
-  ${days ? sql`AND request_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)` : sql``}
-  ${projectCodes && projectCodes.length > 0
-    ? sql`
-      AND project_code IN (
+SELECT
+    COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel') AS project_code,
+
+    /* 1 Project = 1 WBS */
+    MAX(mp.wbs) AS wbs,
+
+    /* Total GR */
+    COUNT(DISTINCT mp.no_po) AS total_gr,
+
+    /* Request terakhir */
+    MAX(mp.arrival_date) AS arrival_date,
+
+    /* Jumlah item yang masih Proses PO */
+    SUM(
+        CASE
+            WHEN mp.status = 'Diterima' THEN 1
+            ELSE 0
+        END
+    ) AS item_gr_diproses,
+
+    /* Total item GR selain dibatalkan */
+    SUM(
+        CASE
+            WHEN mp.status <> 'Dibatalkan' THEN 1
+            ELSE 0
+        END
+    ) AS total_item_gr,
+
+    /* Selisih item */
+    SUM(
+        CASE
+            WHEN mp.status <> 'Dibatalkan' THEN 1
+            ELSE 0
+        END
+    )
+    -
+    SUM(
+        CASE
+            WHEN mp.status = 'Diterima' THEN 1
+            ELSE 0
+        END
+    ) AS selisih_item_gr,
+
+    /* Persentase item diproses */
+    ROUND(
+        SUM(
+            CASE
+                WHEN mp.status = 'Diterima' THEN 1
+                ELSE 0
+            END
+        ) * 100.0 /
+        NULLIF(
+            SUM(
+                CASE
+                    WHEN mp.status <> 'Dibatalkan' THEN 1
+                    ELSE 0
+                END
+            ),
+            0
+        ),
+        0
+    ) AS percentage_item_gr,
+
+    /* Average Lead Time */
+ROUND(
+    AVG(
+        CASE
+            WHEN mp.status = 'Diterima'
+            THEN mp.lead_time
+        END
+    ),
+0
+) AS avg_lead_time_gr
+
+FROM material_po mp
+
+WHERE mp.no_po IS NOT NULL
+AND mp.status = 'Diterima'
+
+${days
+  ? sql`
+      AND mp.po_date >= DATE_SUB(
+          CURDATE(),
+          INTERVAL ${Number(days)} DAY
+      )
+    `
+  : sql``}
+
+${projectCodes && projectCodes.length > 0
+  ? sql`
+      AND COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel')
+      IN (
         ${sql.join(
           projectCodes.map((p) => sql`${p}`),
           sql`, `
         )}
-      )`
-    : sql``}
-ORDER BY no_item_po
+      )
+    `
+  : sql``}
 
-           `);
+${months && months.length > 0
+  ? sql`
+      AND MONTH(mp.po_date) IN (
+        ${sql.join(
+          months.map((m) => sql`${Number(m)}`),
+          sql`, `
+        )}
+      )
+    `
+  : sql``}
+
+GROUP BY COALESCE(NULLIF(mp.project_code, ''), 'Belum Terlabel')
+
+ORDER BY MAX(mp.arrival_date) DESC
+`);
+
+    const rows = Array.isArray(result[0]) ? result[0] : result;
+
+    return rows as kanban_gr[];
+
+  } catch (error) {
+    console.error("Gagal mengambil data Kanban GR:", error);
+    return [];
+  }
+}
+
+
+export async function getDetailMaterialPOByPO(
+  projectCode?: string,
+  days?: number
+): Promise<material_po[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        no_item_po,
+        no_po,
+        komat,
+        material_name,
+        qty_requested,
+        qty_ordered,
+        qty_arrived,
+        satuan,
+        status
+      FROM material_po
+      WHERE status = 'Proses PO'
+
+      ${projectCode
+        ? projectCode === "Belum Terlabel"
+          ? sql`AND (project_code IS NULL OR project_code = '')`
+          : sql`AND project_code = ${projectCode}`
+        : sql``}
+
+      ${days
+        ? sql`AND po_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)`
+        : sql``}
+
+      ORDER BY no_item_po;
+    `);
+
     const rows = Array.isArray(result[0]) ? result[0] : result;
     return rows as material_po[];
   } catch (error) {
@@ -1016,33 +1175,99 @@ ORDER BY no_item_po
   }
 }
 
+export async function getDetailMaterialPOByGR(
+  projectCode?: string,
+  days?: number
+): Promise<material_gr[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        no_item_po,
+        no_po,
+        komat,
+        material_name,
+        qty_requested,
+        qty_ordered,
+        qty_arrived,
+        satuan,
+        status
+      FROM material_po
+      WHERE status = 'Diterima'
+
+      ${projectCode
+        ? projectCode === "Belum Terlabel"
+          ? sql`AND (project_code IS NULL OR project_code = '')`
+          : sql`AND project_code = ${projectCode}`
+        : sql``}
+
+      ${days
+        ? sql`AND po_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)`
+        : sql``}
+
+      ORDER BY no_item_po;
+    `);
+
+    const rows = Array.isArray(result[0]) ? result[0] : result;
+    return rows as material_gr[];
+  } catch (error) {
+    console.error("Gagal mengambil detail data material GR:", error);
+    return [];
+  }
+}
+
 export async function getDetailMaterialPR(
-  no_pr?: string,
-  projectCodes?: string[],
+  filterValue?: string,
+  filterByProjectCode = true,
   days?: number
 ): Promise<material_pr[]> {
   try {
     const result = await db.execute(sql`
-SELECT no_item_pr, material_name, qty_requested, qty_ordered, qty_arrived, satuan, status 
-FROM material_po 
-WHERE no_pr = ${no_pr}
-  ${days ? sql`AND request_date >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)` : sql``}
-  ${projectCodes && projectCodes.length > 0
-    ? sql`
-      AND project_code IN (
-        ${sql.join(
-          projectCodes.map((p) => sql`${p}`),
-          sql`, `
-        )}
-      )`
-    : sql``}
-ORDER BY no_item_pr
+SELECT
+    no_item_pr,
+    no_pr,
+    komat,
+    material_name,
+    qty_requested,
+    qty_ordered,
+    qty_arrived,
+    satuan,
+    status
+FROM material_po
 
-           `);
+WHERE status = 'Proses PR'
+
+${filterValue
+  ? filterByProjectCode
+    ? filterValue === "Belum Terlabel"
+      ? sql`
+          AND (project_code IS NULL OR project_code = '')
+        `
+      : sql`
+          AND project_code = ${filterValue}
+        `
+    : sql`
+          AND no_pr = ${filterValue}
+        `
+  : sql``}
+
+${days
+  ? sql`
+      AND request_date >= DATE_SUB(
+        CURDATE(),
+        INTERVAL ${Number(days)} DAY
+      )
+    `
+  : sql``}
+
+ORDER BY no_item_pr
+`);
+
     const rows = Array.isArray(result[0]) ? result[0] : result;
+
     return rows as material_pr[];
+
   } catch (error) {
-    console.error("Gagal mengambil data material:", error);
+    console.error("Gagal mengambil detail data material PR:", error);
     return [];
   }
 }

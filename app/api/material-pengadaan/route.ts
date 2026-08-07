@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPengadaanPercentage, getAverageLeadTime, getTopProjects, getDevQty, getKanbanPR, getKanbanPO, getVendorPerformance, getDistinctProjectCodes } from "@/lib/queries/material_po";
+import { getPengadaanPercentage, getAverageLeadTime, getTopProjects, getDevQty, getKanbanPR, getKanbanPO, getKanbanGR, getVendorPerformance, getDistinctProjectCodes } from "@/lib/queries/material_po";
 import { getKanbanReqPR } from "@/lib/queries/request_pr";
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const projectCodesFilter = projectCodeParam ? [projectCodeParam] : undefined;
 
-    const [percentageRows, leadTimeRows, topProjectsRows, devQtyRows, kanbanPRRows, kanbanReqPRRows, kanbanPORows, vendorPerformanceRows, projectCodes] = await Promise.all([
+    const [percentageRows, leadTimeRows, topProjectsRows, devQtyRows, kanbanPRRows, kanbanReqPRRows, kanbanPORows, kanbanGRRows, vendorPerformanceRows, projectCodes] = await Promise.all([
       getPengadaanPercentage(undefined, projectCodesFilter, days),
       getAverageLeadTime(undefined, projectCodesFilter, days),
       getTopProjects(undefined, projectCodesFilter, days),
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       getKanbanPR(undefined, projectCodesFilter, days),
       getKanbanReqPR(days),
       getKanbanPO(undefined, projectCodesFilter, days),
+      getKanbanGR(undefined, projectCodesFilter, days),
       getVendorPerformance(undefined, projectCodesFilter, days),
       getDistinctProjectCodes(days),
     ]);
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       kanban_pr: Array.isArray(kanbanPRRows) ? kanbanPRRows : [],
       kanban_req_pr: Array.isArray(kanbanReqPRRows) ? kanbanReqPRRows : [],
       kanban_po: Array.isArray(kanbanPORows) ? kanbanPORows : [],
+      kanban_gr: Array.isArray(kanbanGRRows) ? kanbanGRRows : [],
       dev_qty_pr_po: Array.isArray(devQtyRows) && devQtyRows.length > 0 ? devQtyRows[0]?.percentage_qty_pr_po ?? 0 : 0,
       dev_qty_po_gr: Array.isArray(devQtyRows) && devQtyRows.length > 0 ? devQtyRows[0]?.percentage_qty_po_gr ?? 0 : 0,
       vendor_performance: Array.isArray(vendorPerformanceRows) ? vendorPerformanceRows : [],

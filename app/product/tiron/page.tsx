@@ -77,21 +77,33 @@ export default function WorkshopTironPage({ data: initialData, initialTrainset }
         const apiOptions = Array.isArray(json.data) ? json.data : [];
         if (apiOptions.length > 0) {
           setProjectOptions(apiOptions);
+          // Auto-select the first project if none is selected
+          if (!selectedProject && apiOptions.length > 0) {
+            setSelectedProject(apiOptions[0]);
+          }
         } else {
           const derived = Array.from(new Set(allData.map((d) => String(d.project || '').trim()).filter(Boolean)));
           setProjectOptions(derived);
+          // Auto-select the first project if none is selected
+          if (!selectedProject && derived.length > 0) {
+            setSelectedProject(derived[0]);
+          }
         }
       } catch (e) {
         if (!mounted) return;
         console.error('Gagal memuat pilihan project:', e);
         const derived = Array.from(new Set(allData.map((d) => String(d.project || '').trim()).filter(Boolean)));
         setProjectOptions(derived);
+        // Auto-select the first project if none is selected
+        if (!selectedProject && derived.length > 0) {
+          setSelectedProject(derived[0]);
+        }
       }
     };
 
     fetchProjectOptions();
     return () => { mounted = false; };
-  }, [allData]);
+  }, [allData, selectedProject]);
 
   useEffect(() => {
     if (!selectedProject && !selectedTrainset) return;

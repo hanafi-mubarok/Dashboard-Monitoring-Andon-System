@@ -20,6 +20,9 @@ export interface material_req_pr {
     qty: number;
     satuan: string;
     status: string;
+    qty_requested: number;
+    qty_ordered: number;
+    qty_arrived: number;
 }
 
 
@@ -30,23 +33,40 @@ export async function getKanbanReqPR(
 ): Promise<kanban_req_pr[]> {
   try {
     const result = await db.execute(sql`
-SELECT
+WITH pr_distinct AS (
+    SELECT
+        MIN(id) AS id
+    FROM request_pr
+    WHERE 1=1
+    ${days 
+        ? sql`AND tanggal >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)` 
+        : sql``}
+    GROUP BY
+        no_surat,
+        material_name
+)
+
+SELECT 
     rp.no_surat,
+
     MAX(rp.pic) AS pic,
     MAX(rp.tanggal) AS tanggal,
     MAX(rp.project_name) AS project_name,
     MAX(rp.link) AS link,
 
-    /* Jumlah item dalam 1 no_surat */
+    /* Jumlah material unik per surat */
     COUNT(*) AS jumlah_item,
 
-    /* Jumlah item yang sudah diproses ke material_po */
+    /* Jumlah material yang sudah masuk material_po */
     SUM(
         CASE
             WHEN EXISTS (
                 SELECT 1
                 FROM material_po mp
-                WHERE mp.material_name = rp.material_name
+                WHERE (
+                        mp.komat = rp.kode_material
+                     OR mp.material_name = rp.material_name
+                      )
                   AND mp.request_date >= rp.tanggal
                   AND mp.qty_requested = rp.qty
             )
@@ -55,14 +75,18 @@ SELECT
         END
     ) AS jumlah_item_diproses,
 
-    /* Persentase diproses */
+
+    /* Persentase material diproses */
     ROUND(
         SUM(
             CASE
                 WHEN EXISTS (
                     SELECT 1
                     FROM material_po mp
-                    WHERE mp.material_name = rp.material_name
+                    WHERE (
+                            mp.komat = rp.kode_material
+                         OR mp.material_name = rp.material_name
+                          )
                       AND mp.request_date >= rp.tanggal
                       AND mp.qty_requested = rp.qty
                 )
@@ -73,40 +97,61 @@ SELECT
         0
     ) AS persentase_diproses,
 
-    /* Lead time rata-rata per surat */
+
+    /* Rata-rata lead time */
     ROUND(
         AVG(
             CASE
-                /* Jika ditemukan di material_po */
+
+                /* Jika sudah ada material_po */
                 WHEN EXISTS (
                     SELECT 1
                     FROM material_po mp
-                    WHERE mp.material_name = rp.material_name
+                    WHERE (
+                            mp.komat = rp.kode_material
+                         OR mp.material_name = rp.material_name
+                          )
                       AND mp.request_date >= rp.tanggal
-                      AND mp.qty_requested = rp.qty
                 )
                 THEN (
-                    SELECT DATEDIFF(MIN(mp.request_date), rp.tanggal)
+                    SELECT 
+                        DATEDIFF(
+                            MIN(mp.request_date),
+                            rp.tanggal
+                        )
                     FROM material_po mp
-                    WHERE mp.material_name = rp.material_name
-                      AND mp.request_date > rp.tanggal
-                      AND mp.qty_requested = rp.qty
+                    WHERE (
+                            mp.komat = rp.kode_material
+                         OR mp.material_name = rp.material_name
+                          )
+                      AND mp.request_date >= rp.tanggal
                 )
 
-                /* Jika belum ditemukan */
-                ELSE DATEDIFF(CURDATE(), rp.tanggal)
+                /* Jika belum diproses */
+                ELSE DATEDIFF(
+                    CURDATE(),
+                    rp.tanggal
+                )
+
             END
         ),
         0
     ) AS lead_time
 
-FROM request_pr rp
-WHERE 1=1
-${days ? sql`AND rp.tanggal >= DATE_SUB(CURDATE(), INTERVAL ${Number(days)} DAY)` : sql``}
-GROUP BY rp.no_surat
-ORDER BY MAX(rp.tanggal) DESC;
 
-           `);
+FROM request_pr rp
+
+INNER JOIN pr_distinct pd
+    ON rp.id = pd.id
+
+
+GROUP BY
+    rp.no_surat
+
+ORDER BY
+    MAX(rp.tanggal) DESC;
+    `);
+
     const rows = Array.isArray(result[0]) ? result[0] : result;
     return rows as kanban_req_pr[];
   } catch (error) {
@@ -126,23 +171,115 @@ SELECT
     rp.qty,
     rp.satuan,
 
+    /* Status */
     COALESCE(
+        (
+            SELECT mp.status
+            FROM material_po mp
+            WHERE mp.komat = rp.kode_material
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
         (
             SELECT mp.status
             FROM material_po mp
             WHERE mp.material_name = rp.material_name
               AND mp.request_date >= rp.tanggal
-              AND mp.qty_requested = rp.qty
             ORDER BY mp.request_date DESC
             LIMIT 1
         ),
         'Reservasi'
-    ) AS status
+    ) AS status,
+
+
+    /* Qty Requested */
+    COALESCE(
+        (
+            SELECT mp.qty_requested
+            FROM material_po mp
+            WHERE mp.komat = rp.kode_material
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        (
+            SELECT mp.qty_requested
+            FROM material_po mp
+            WHERE mp.material_name = rp.material_name
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        0
+    ) AS qty_requested,
+
+
+    /* Qty Ordered */
+    COALESCE(
+        (
+            SELECT mp.qty_ordered
+            FROM material_po mp
+            WHERE mp.komat = rp.kode_material
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        (
+            SELECT mp.qty_ordered
+            FROM material_po mp
+            WHERE mp.material_name = rp.material_name
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        0
+    ) AS qty_ordered,
+
+
+    /* Qty Arrived */
+    COALESCE(
+        (
+            SELECT mp.qty_arrived
+            FROM material_po mp
+            WHERE mp.komat = rp.kode_material
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        (
+            SELECT mp.qty_arrived
+            FROM material_po mp
+            WHERE mp.material_name = rp.material_name
+              AND mp.request_date >= rp.tanggal
+            ORDER BY mp.request_date DESC
+            LIMIT 1
+        ),
+        0
+    ) AS qty_arrived
+
 
 FROM request_pr rp
-WHERE rp.no_surat = ${no_surat};
 
-           `);
+INNER JOIN (
+    SELECT
+        MIN(id) AS id
+    FROM request_pr
+    WHERE no_surat = ${no_surat}
+
+    /* DISTINCT berdasarkan nama material saja */
+    GROUP BY
+        no_surat,
+        material_name
+
+) d
+ON rp.id = d.id
+
+
+ORDER BY
+    rp.material_name;
+    `);
+
     const rows = Array.isArray(result[0]) ? result[0] : result;
     return rows as material_req_pr[];
   } catch (error) {

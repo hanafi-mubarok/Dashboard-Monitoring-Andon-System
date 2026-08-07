@@ -5,7 +5,15 @@ import jwt from "jsonwebtoken";
 import {
   getAllMaterials,
   getDistinctProducts,
+  getDistinctProjects,
+  getDistinctProductsByProject,
+  getDistinctSubProducts,
+  getDistinctSubProductsByProject,
   getMaterialByProduct,
+  getMaterialsByProject,
+  getMaterialsByProjectAndSubProduct,
+  getMaterialsByProductAndSubProduct,
+  getMaterialsBySubProduct,
 } from "@/lib/queries/master_material";
 import { getRecentNoKPM } from "@/lib/queries/stok_material";
 import MaterialFilters from "@/components/material/MaterialFilters";
@@ -26,10 +34,18 @@ function monthToRoman(month: number): string {
 
 export default async function MaterialPage({ searchParams }: MaterialPageProps) {
   const resolvedSearchParams = await searchParams;
+  const selectedProjectParam = Array.isArray(resolvedSearchParams?.project)
+    ? resolvedSearchParams.project[0]
+    : resolvedSearchParams?.project;
+  const selectedProject = (selectedProjectParam ?? "").trim();
   const selectedProductParam = Array.isArray(resolvedSearchParams?.produk)
     ? resolvedSearchParams.produk[0]
     : resolvedSearchParams?.produk;
   const selectedProduct = (selectedProductParam ?? "").trim();
+  const selectedSubProductParam = Array.isArray(resolvedSearchParams?.sub_produk)
+    ? resolvedSearchParams.sub_produk[0]
+    : resolvedSearchParams?.sub_produk;
+  const selectedSubProduct = (selectedSubProductParam ?? "").trim();
   const quantityParam = Array.isArray(resolvedSearchParams?.quantity)
     ? resolvedSearchParams.quantity[0]
     : resolvedSearchParams?.quantity;
@@ -62,11 +78,31 @@ export default async function MaterialPage({ searchParams }: MaterialPageProps) 
     canManageMaterialDelivery = false;
   }
 
-  const [products, materials, latestNoKpm] = await Promise.all([
+  const [projects, allProducts, latestNoKpm] = await Promise.all([
+    getDistinctProjects(),
     getDistinctProducts(),
-    selectedProduct ? getMaterialByProduct(selectedProduct) : getAllMaterials(),
     getRecentNoKPM(),
   ]);
+
+  const filteredProducts = selectedProject
+    ? await getDistinctProductsByProject(selectedProject)
+    : allProducts;
+
+  const subProducts = selectedProject
+    ? await getDistinctSubProductsByProject(selectedProject)
+    : await getDistinctSubProducts();
+
+  const materials = selectedProduct && selectedSubProduct
+    ? await getMaterialsByProductAndSubProduct(selectedProduct, selectedSubProduct)
+    : selectedProduct
+      ? await getMaterialByProduct(selectedProduct)
+      : selectedSubProduct && selectedProject
+        ? await getMaterialsByProjectAndSubProduct(selectedProject, selectedSubProduct)
+        : selectedSubProduct
+          ? await getMaterialsBySubProduct(selectedSubProduct)
+          : selectedProject
+            ? await getMaterialsByProject(selectedProject)
+            : await getAllMaterials();
 
   const today = new Date();
   const currentMonthNumber = today.getMonth() + 1; // 0-indexed, so add 1
@@ -90,8 +126,12 @@ export default async function MaterialPage({ searchParams }: MaterialPageProps) 
         <Card className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50">
           <CardContent className="p-4">
             <MaterialFilters
-              products={products}
+              projects={projects}
+              selectedProject={selectedProject}
+              products={filteredProducts}
               selectedProduct={selectedProduct}
+              subProducts={subProducts}
+              selectedSubProduct={selectedSubProduct}
               quantity={quantity}
               trainset={trainset}
               nama={nama}

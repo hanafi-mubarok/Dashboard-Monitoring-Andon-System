@@ -62,30 +62,32 @@ export function frustumPath(cx, y, h, topWidth, bottomWidth) {
 }
 
 export function renderStatusBadge(status) {
-  const s = String(status || "");
+  const s = String(status || "").trim();
   const normalized = s.toLowerCase();
   let colorClass = "bg-gray-600 text-white";
   let label = "-";
 
-  if (normalized.includes("dibatalkan") || normalized.includes("batal")) {
+  // robust matching for common status variants
+  if (normalized.includes("batal") || normalized.includes("dibatalkan")) {
     colorClass = "bg-gray-400 text-white";
     label = "X";
-  } else if (/\bproses\s*pr\b/.test(normalized) || /\bpr\b/.test(normalized)) {
+  } else if (normalized.includes("reservasi")) {
+    colorClass = "bg-gray-500 text-white";
+    label = "RES";
+  } else if (normalized.includes("pr")) {
     colorClass = "bg-red-500 text-white";
-    label = "PR";
-  } else if (/\bproses\s*po\b/.test(normalized) || /\bpo\b/.test(normalized)) {
+    label = "PR";   
+  } else if (normalized.includes("po")) {
     colorClass = "bg-amber-400 text-black";
     label = "PO";
   } else if (normalized.includes("diterima") || /\bgr\b/.test(normalized)) {
     colorClass = "bg-emerald-500 text-white";
     label = "GR";
-  } else if (normalized.includes("reservasi") || /\breservasi\b/.test(normalized)) {
-    colorClass = "bg-gray-500 text-white";
-    label = "RES";
+
   }
 
   return (
-    <div className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-[10px] font-semibold ${colorClass} pulse-badge`}>
+    <div className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-[11px] font-semibold ${colorClass} pulse-badge`} title={s}>
       {label}
     </div>
   );
@@ -102,8 +104,8 @@ export function getAvgLeadTimePrBadgeClass(value) {
 }
 
 export function formatAvgLeadTimePr(value) {
-  const parsed = typeof value === "string" ? Number(value.replace(/[^\d.-]/g, "")) : Number(value);
-  return Number.isFinite(parsed) ? parsed : "-";
+  const parsed = typeof value === 'string' ? Number(String(value).replace(/[^\d.-]/g, '')) : Number(value);
+  return Number.isFinite(parsed) ? parsed : '-';
 }
 
 export function parseLeadTime(value) {
@@ -111,44 +113,85 @@ export function parseLeadTime(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function getEffectiveStatus(status, qtyRequested, qtyOrdered) {
+export function getEffectiveStatus(status, qtyRequested, qtyOrdered, qtyArrived) {
+  const s = String(status || "").toLowerCase();
   const qtyReq = Number(qtyRequested) || 0;
   const qtyOrd = Number(qtyOrdered) || 0;
-  if (qtyOrd < qtyReq && qtyReq > 0) {
-    return "proses pr";
-  }
+  const qtyArr = Number(qtyArrived) || 0;
+
+  // Preserve explicit cancel/reservasi statuses
+  if (s.includes("batal") || s.includes("dibatalkan")) return status;
+  if (s.includes("reservasi")) return status;
+  // If arrived quantity exists, treat as received (GR)
+  if (qtyArr > 0) return "diterima";
+
+  // If some quantity has been ordered, treat as PO
+  if (qtyOrd > 0) return "po";
+
+  //  // If ordered < requested then still PR
+  if (qtyReq > 0 && qtyOrd <= qtyReq) return "pr";
+
   return status;
 }
 
-export function renderMaterialQuantities(item) {
+export function renderMaterialQuantities(item, showAllQuantities = false) {
   const s = String(item.status || "").toLowerCase();
-  const qtyRequested = item.qty_requested ?? "-";
-  const qtyOrdered = item.qty_ordered ?? "-";
-  const qtyArrived = item.qty_arrived ?? "-";
-  const unit = item.satuan ?? "";
+  const qtyResCount = Number(item.qty) || 0;
+  const qtyRequestedCount = Number(item.qty_requested) || 0;
+  const qtyOrderedCount = Number(item.qty_ordered) || 0;
+  const qtyArrivedCount = Number(item.qty_arrived) || 0;
+  const qtyRes = qtyResCount.toString();
+  const qtyRequested = qtyRequestedCount.toString();
+  const qtyOrdered = qtyOrderedCount.toString();
+  const qtyArrived = qtyArrivedCount.toString();
+  const unit = item.satuan ? ` ${item.satuan}` : "";
+
+  const tags = [];
+  if (showAllQuantities) {
+    if (qtyResCount > 0) tags.push(`Qty Res ${qtyRes}${unit}`);
+    if (qtyRequestedCount > 0) tags.push(`Qty PR ${qtyRequested}${unit}`);
+    if (qtyOrderedCount > 0) tags.push(`Qty PO ${qtyOrdered}${unit}`);
+    if (qtyArrivedCount > 0) tags.push(`Qty GR ${qtyArrived}${unit}`);
+
+    return tags.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-gray-300">
+        {tags.map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
+      </div>
+    ) : null;
+  }
 
   if (/\b(proses\s*pr|pr)\b/.test(s)) {
-    return <div className="text-[11px] text-gray-300 mt-1">Qty PR {qtyRequested}{unit}</div>;
+    return qtyRequestedCount > 0 ? <div className="text-[11px] text-gray-300 mt-1">Qty PR {qtyRequested}{unit}</div> : null;
   }
 
   if (/\b(proses\s*po|po)\b/.test(s)) {
-    return (
+    const items = [];
+    if (qtyRequestedCount > 0) items.push(`Qty PR ${qtyRequested}${unit}`);
+    if (qtyOrderedCount > 0) items.push(`Qty PO ${qtyOrdered}${unit}`);
+    return items.length > 0 ? (
       <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-gray-300">
-        <span>Qty PR {qtyRequested}{unit}</span>
-        <span>Qty PO {qtyOrdered}{unit}</span>
+        {items.map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
       </div>
-    );
+    ) : null;
   }
 
   if (s.includes("diterima") || /\bgr\b/.test(s)) {
-    return (
+    const items = [];
+    if (qtyRequestedCount > 0) items.push(`Qty PR ${qtyRequested}${unit}`);
+    if (qtyOrderedCount > 0) items.push(`Qty PO ${qtyOrdered}${unit}`);
+    if (qtyArrivedCount > 0) items.push(`Qty GR ${qtyArrived}${unit}`);
+    return items.length > 0 ? (
       <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-gray-300">
-        <span>Qty PR {qtyRequested}{unit}</span>
-        <span>Qty PO {qtyOrdered}{unit}</span>
-        <span>Qty GR {qtyArrived}{unit}</span>
+        {items.map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
       </div>
-    );
+    ) : null;
   }
 
-  return <div className="text-[11px] text-gray-300 mt-1">Qty Req {qtyRequested}{unit}</div>;
+  return qtyRequestedCount > 0 ? <div className="text-[11px] text-gray-300 mt-1">Qty Req {qtyRequested}{unit}</div> : null;
 }

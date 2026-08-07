@@ -55,14 +55,18 @@ export default function PengadaanDashboard({ data: dataProp, editable = true }) 
   const [mounted, setMounted] = useState(false);
   const [expandedPOs, setExpandedPOs] = useState({});
   const [expandedPRs, setExpandedPRs] = useState({});
+  const [expandedGRs, setExpandedGRs] = useState({});
   const [expandedRequestPRs, setExpandedRequestPRs] = useState({});
   const [poDetailsByPo, setPoDetailsByPo] = useState({});
+  const [grDetailsByProject, setGrDetailsByProject] = useState({});
   const [prDetailsByPr, setPrDetailsByPr] = useState({});
   const [requestPRDetailsBySurat, setRequestPRDetailsBySurat] = useState({});
   const [poDetailLoading, setPoDetailLoading] = useState({});
+  const [grDetailLoading, setGrDetailLoading] = useState({});
   const [prDetailLoading, setPrDetailLoading] = useState({});
   const [requestPRDetailLoading, setRequestPRDetailLoading] = useState({});
   const [poDetailError, setPoDetailError] = useState({});
+  const [grDetailError, setGrDetailError] = useState({});
   const [prDetailError, setPrDetailError] = useState({});
   const [requestPRDetailError, setRequestPRDetailError] = useState({});
   const [daysFilter, setDaysFilter] = useState(30);
@@ -191,17 +195,17 @@ const geom = useMemo(
     setData((d) => ({ ...d, [key]: Number(e.target.value) }));
   };
 
-  const fetchPODetails = async (no_po) => {
-    if (!no_po || poDetailsByPo[no_po] || poDetailLoading[no_po]) return;
-    setPoDetailLoading((prev) => ({ ...prev, [no_po]: true }));
-    setPoDetailError((prev) => ({ ...prev, [no_po]: undefined }));
+  const fetchPODetails = async (projectCode) => {
+    if (!projectCode || poDetailsByPo[projectCode] || poDetailLoading[projectCode]) return;
+    setPoDetailLoading((prev) => ({ ...prev, [projectCode]: true }));
+    setPoDetailError((prev) => ({ ...prev, [projectCode]: undefined }));
 
     try {
       const params = new URLSearchParams({
-        no_po: no_po,
+        mode: 'po',
+        project_code: projectCode,
         days: String(daysFilter),
       });
-      if (projectFilter) params.set('project_code', projectFilter);
 
       const response = await fetch(`/api/material-po/detail?${params.toString()}`, {
         cache: 'no-store',
@@ -209,33 +213,36 @@ const geom = useMemo(
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const json = await response.json();
       if (!json.success) throw new Error(json.error || 'Gagal mengambil detail');
-      setPoDetailsByPo((prev) => ({ ...prev, [no_po]: json.rows || [] }));
+      setPoDetailsByPo((prev) => ({ ...prev, [projectCode]: json.rows || [] }));
     } catch (error) {
-      setPoDetailError((prev) => ({ ...prev, [no_po]: String(error) }));
+      setPoDetailError((prev) => ({ ...prev, [projectCode]: String(error) }));
     } finally {
-      setPoDetailLoading((prev) => ({ ...prev, [no_po]: false }));
+      setPoDetailLoading((prev) => ({ ...prev, [projectCode]: false }));
     }
   };
 
-  const togglePODetails = async (no_po) => {
-    if (!no_po) return;
-    setExpandedPOs((prev) => ({ ...prev, [no_po]: !prev[no_po] }));
-    if (!poDetailsByPo[no_po]) {
-      await fetchPODetails(no_po);
+  const togglePODetails = async (projectCode) => {
+    if (!projectCode) return;
+    setExpandedPOs((prev) => ({ ...prev, [projectCode]: !prev[projectCode] }));
+    if (!poDetailsByPo[projectCode]) {
+      await fetchPODetails(projectCode);
     }
   };
 
-  const fetchPRDetails = async (no_pr) => {
-    if (!no_pr || prDetailsByPr[no_pr] || prDetailLoading[no_pr]) return;
-    setPrDetailLoading((prev) => ({ ...prev, [no_pr]: true }));
-    setPrDetailError((prev) => ({ ...prev, [no_pr]: undefined }));
+  const fetchPRDetails = async (filterValue, filterByProjectCode = true) => {
+    if (!filterValue || prDetailsByPr[filterValue] || prDetailLoading[filterValue]) return;
+    setPrDetailLoading((prev) => ({ ...prev, [filterValue]: true }));
+    setPrDetailError((prev) => ({ ...prev, [filterValue]: undefined }));
 
     try {
       const params = new URLSearchParams({
-        no_pr: no_pr,
         days: String(daysFilter),
       });
-      if (projectFilter) params.set('project_code', projectFilter);
+      if (filterByProjectCode) {
+        params.set('project_code', filterValue);
+      } else {
+        params.set('no_pr', filterValue);
+      }
 
       const response = await fetch(`/api/material-po/detail?${params.toString()}`, {
         cache: 'no-store',
@@ -243,21 +250,56 @@ const geom = useMemo(
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const json = await response.json();
       if (!json.success) throw new Error(json.error || 'Gagal mengambil detail');
-      setPrDetailsByPr((prev) => ({ ...prev, [no_pr]: json.rows || [] }));
+      setPrDetailsByPr((prev) => ({ ...prev, [filterValue]: json.rows || [] }));
     } catch (error) {
-      setPrDetailError((prev) => ({ ...prev, [no_pr]: String(error) }));
+      setPrDetailError((prev) => ({ ...prev, [filterValue]: String(error) }));
     } finally {
-      setPrDetailLoading((prev) => ({ ...prev, [no_pr]: false }));
+      setPrDetailLoading((prev) => ({ ...prev, [filterValue]: false }));
     }
   };
 
-  const togglePRDetails = async (no_pr) => {
-    if (!no_pr) return;
-    setExpandedPRs((prev) => ({ ...prev, [no_pr]: !prev[no_pr] }));
-    if (!prDetailsByPr[no_pr]) {
-      await fetchPRDetails(no_pr);
+  const togglePRDetails = async (filterValue, filterByProjectCode = true) => {
+    if (!filterValue) return;
+    setExpandedPRs((prev) => ({ ...prev, [filterValue]: !prev[filterValue] }));
+    if (!prDetailsByPr[filterValue]) {
+      await fetchPRDetails(filterValue, filterByProjectCode);
     }
   };
+
+  const fetchGRDetails = async (projectCode) => {
+    if (!projectCode || grDetailsByProject[projectCode] || grDetailLoading[projectCode]) return;
+    setGrDetailLoading((prev) => ({ ...prev, [projectCode]: true }));
+    setGrDetailError((prev) => ({ ...prev, [projectCode]: undefined }));
+
+    try {
+      const params = new URLSearchParams({
+        project_code: projectCode,
+        mode: 'gr',
+        days: String(daysFilter),
+      });
+
+      const response = await fetch(`/api/material-po/detail?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      if (!json.success) throw new Error(json.error || 'Gagal mengambil detail');
+      setGrDetailsByProject((prev) => ({ ...prev, [projectCode]: json.rows || [] }));
+    } catch (error) {
+      setGrDetailError((prev) => ({ ...prev, [projectCode]: String(error) }));
+    } finally {
+      setGrDetailLoading((prev) => ({ ...prev, [projectCode]: false }));
+    }
+  };
+
+  const toggleGRDetails = async (projectCode) => {
+    if (!projectCode) return;
+    setExpandedGRs((prev) => ({ ...prev, [projectCode]: !prev[projectCode] }));
+    if (!grDetailsByProject[projectCode]) {
+      await fetchGRDetails(projectCode);
+    }
+  };
+
 
   const fetchRequestPRDetails = async (no_surat) => {
     if (!no_surat || requestPRDetailsBySurat[no_surat] || requestPRDetailLoading[no_surat]) return;
@@ -553,6 +595,11 @@ const geom = useMemo(
         toggleRequestPRDetails={toggleRequestPRDetails}
         togglePRDetails={togglePRDetails}
         togglePODetails={togglePODetails}
+        expandedGRs={expandedGRs}
+        grDetailsByProject={grDetailsByProject}
+        grDetailLoading={grDetailLoading}
+        grDetailError={grDetailError}
+        toggleGRDetails={toggleGRDetails}
         renderStatusBadge={renderStatusBadge}
         getAvgLeadTimePrBadgeClass={getAvgLeadTimePrBadgeClass}
         formatDateOnly={formatDateOnly}

@@ -18,6 +18,7 @@ export default function PengadaanKanbanSection({
   expandedRequestPRs,
   expandedPRs,
   expandedPOs,
+  expandedGRs,
   requestPRDetailsBySurat,
   requestPRDetailLoading,
   requestPRDetailError,
@@ -25,11 +26,15 @@ export default function PengadaanKanbanSection({
   prDetailLoading,
   prDetailError,
   poDetailsByPo,
+  grDetailsByProject,
   poDetailLoading,
+  grDetailLoading,
   poDetailError,
+  grDetailError,
   toggleRequestPRDetails,
   togglePRDetails,
   togglePODetails,
+  toggleGRDetails,
   renderStatusBadge,
   getAvgLeadTimePrBadgeClass,
   formatDateOnly,
@@ -44,7 +49,7 @@ export default function PengadaanKanbanSection({
   const reqPR = requestPR;
   const prosesPR = prList.filter((p) => Number(p.percentage_item_pr) < 100);
   const prosesPO = poList.filter((p) => Number(p.percentage_item_po) < 100);
-  const grList = poList.filter((p) => Number(p.percentage_item_po) >= 100);
+  const grList = Array.isArray((data || {}).kanban_gr) ? data.kanban_gr : [];
 
   return (
     <div style={{ marginTop: 18 }}>
@@ -145,10 +150,10 @@ export default function PengadaanKanbanSection({
                             <div className="min-w-0">
                               <div className="text-[11px] text-gray-300 mt-1">{item.kode_material}</div>
                               <div className="text-xs font-semibold text-white break-words" title={item.material_name}>{item.material_name}</div>
-                              <div className="text-[11px] text-gray-300 mt-1">Qty {item.qty}{item.satuan ? ` ${item.satuan}` : ''}</div>
+                              {renderMaterialQuantities(item, true)}
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty, item.qty))}
+                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered, item.qty_arrived))}
                             </div>
                           </div>
                         ))}
@@ -166,113 +171,116 @@ export default function PengadaanKanbanSection({
         </KanbanColumn>
 
         <KanbanColumn title="Proses PR" badgeBg="bg-red-400" count={prosesPR.length}>
-          {prosesPR.length > 0 ? prosesPR.map((r, idx) => (
-            <Card key={`propr-${r.no_pr}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-red-500 transition-colors">
-              <CardContent className="relative px-3 py-0.5">
-                <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                  <div className="space-y-0.5 min-w-0 leading-tight">
-                    <div className="text-sm font-semibold text-white truncate">{r.project_code ?? r.no_pr}</div>
-                    <div className="text-xs text-gray-300 truncate">{r.no_pr}</div>
-                    <div className="text-xs text-gray-400 truncate">{r.wbs ?? '-'}</div>
-                    <div className="text-xs text-gray-400 truncate">RK_PPC.{r.account_req ?? '-'}</div>
-                    <Badge className={`${getAvgLeadTimePrBadgeClass(r.avg_lead_time_pr)}`}>Lead Time: {formatAvgLeadTimePr(r.avg_lead_time_pr)} Hari</Badge>
+          {prosesPR.length > 0 ? prosesPR.map((r, idx) => {
+            const detailKey = r.project_code ?? r.no_pr;
+            return (
+              <Card key={`propr-${detailKey}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-red-500 transition-colors">
+                <CardContent className="relative px-3 py-0.5">
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                    <div className="space-y-0.5 min-w-0 leading-tight">
+                      <div className="text-sm font-semibold text-white truncate">{r.project_code ?? r.no_pr}</div>
+                      <div className="text-xs text-gray-400 truncate">{r.wbs ?? '-'}</div>
+                      <div className="text-xs text-gray-400 truncate">Total PR: {r.total_pr ?? '-'}</div>
+                      <Badge className={`${getAvgLeadTimePrBadgeClass(r.avg_lead_time_pr)}`}>PR Aging: {formatAvgLeadTimePr(r.avg_lead_time_pr)} Hari</Badge>
+                    </div>
+                    <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
+                      <div className="text-xs font-semibold text-white">{r.item_pr_diproses ?? 0} / {r.total_item_pr ?? '-'}</div>
+                      <div className="text-xs text-gray-400">PR Terakhir</div>
+                      <div className="text-xs text-gray-300 mt-0.5 truncate">{formatDateOnly(r.request_date)}</div>
+                      <div className="text-xs font-semibold text-white">{r.percentage_item_pr ?? '0'}%</div>
+                      {detailKey ? (
+                        <button
+                          type="button"
+                          onClick={() => togglePRDetails(detailKey, Boolean(r.project_code))}
+                          aria-label={expandedPRs[detailKey] ? 'Tutup detail material' : 'Buka detail material'}
+                          className="self-end mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-cyan-500 hover:bg-gray-800 hover:text-cyan-400"
+                        >
+                          {expandedPRs[detailKey] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
-                    <div className="text-xs font-semibold text-white">{r.item_pr_diproses ?? 0} / {r.total_item_pr ?? '-'}</div>
-                    <div className="text-xs text-gray-400">Req Date</div>
-                    <div className="text-xs text-gray-300 mt-0.5 truncate">{formatDateOnly(r.request_date)}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">ETA</div>
-                    <div className="text-xs text-gray-300 mt-0.5 truncate">{formatDateOnly(r.eta)}</div>
-                    <div className="text-xs font-semibold text-white">{r.percentage_item_pr ?? '0'}%</div>
-                    {r.no_pr ? (
-                      <button
-                        type="button"
-                        onClick={() => togglePRDetails(r.no_pr)}
-                        aria-label={expandedPRs[r.no_pr] ? 'Tutup detail material' : 'Buka detail material'}
-                        className="self-end mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-cyan-500 hover:bg-gray-800 hover:text-cyan-400"
-                      >
-                        {expandedPRs[r.no_pr] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {expandedPRs[r.no_pr] ? (
-                  <div className="mt-3 bg-slate-950/90 border border-slate-700 rounded-xl p-3 text-xs text-gray-300">
-                    {prDetailLoading[r.no_pr] ? (
-                      <div className="text-gray-400">Memuat detail material...</div>
-                    ) : prDetailError[r.no_pr] ? (
-                      <div className="text-rose-400">{prDetailError[r.no_pr]}</div>
-                    ) : Array.isArray(prDetailsByPr[r.no_pr]) && prDetailsByPr[r.no_pr].length > 0 ? (
-                      <div className="space-y-2">
-                        {prDetailsByPr[r.no_pr].map((item) => (
-                          <div key={`${r.no_pr}-${item.no_item_pr}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold text-white break-words" title={item.material_name}>{item.material_name}</div>
-                              {renderMaterialQuantities(item)}
+                  {expandedPRs[detailKey] ? (
+                    <div className="mt-3 bg-slate-950/90 border border-slate-700 rounded-xl p-3 text-xs text-gray-300">
+                      {prDetailLoading[detailKey] ? (
+                        <div className="text-gray-400">Memuat detail material...</div>
+                      ) : prDetailError[detailKey] ? (
+                        <div className="text-rose-400">{prDetailError[detailKey]}</div>
+                      ) : Array.isArray(prDetailsByPr[detailKey]) && prDetailsByPr[detailKey].length > 0 ? (
+                        <div className="space-y-2">
+                          {prDetailsByPr[detailKey].map((item) => (
+                            <div key={`${detailKey}-${item.no_item_pr}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
+                              <div className="min-w-0">
+                                <div className="text-[11px] text-gray-300 mt-1">{item.komat}</div>
+                                <div className="text-xs font-semibold text-white break-words" title={item.material_name}>{item.material_name}</div>
+                                {renderMaterialQuantities(item)}
+                                <div className="text-[11px] text-gray-300 mt-1">No PR: {item.no_pr}</div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered, item.qty_arrived))}
+                              </div>
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-gray-400">Tidak ada detail material.</div>
-                    )}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          )) : (
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-gray-400">Tidak ada detail material.</div>
+                      )}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            );
+          }) : (
             <p className="text-gray-500 text-sm mt-4 text-center">Belum ada data</p>
           )}
         </KanbanColumn>
 
         <KanbanColumn title="Proses PO" badgeBg="bg-amber-400" count={prosesPO.length}>
           {prosesPO.length > 0 ? prosesPO.map((p, idx) => (
-            <Card key={`pp-${p.no_po}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-amber-500 transition-colors">
+            <Card key={`pp-${p.project_code}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-amber-500 transition-colors">
               <CardContent className="relative px-3 py-0.5">
                 <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                   <div className="space-y-0.5 min-w-0 leading-tight">
-                    <div className="text-sm font-semibold text-white truncate">{p.project_code ?? p.no_po}</div>
-                    <div className="text-xs text-gray-300 truncate">No: {p.no_po}</div>
+                    <div className="text-sm font-semibold text-white truncate">{p.project_code}</div>
                     <div className="text-xs text-gray-300 truncate">{p.wbs ?? '-'}</div>
-                    <div className="text-xs text-gray-400 truncate">{p.vendor_name ?? '-'}</div>
-                    <Badge className={`${getAvgLeadTimePrBadgeClass(p.avg_lead_time_po ?? p.avg_lead_time)}`}>Lead Time: {formatAvgLeadTimePr(p.avg_lead_time_po ?? p.avg_lead_time)} Hari</Badge>
+                    <div className="text-xs text-gray-300 truncate">Total PO: {p.total_po}</div>
+                    <Badge className={`${getAvgLeadTimePrBadgeClass(p.avg_lead_time_po ?? p.avg_lead_time)}`}>PO Aging: {formatAvgLeadTimePr(p.avg_lead_time_po ?? p.avg_lead_time)} Hari</Badge>
                   </div>
                   <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
                     <div className="text-xs font-semibold text-white">{p.item_po_diproses ?? 0} / {p.total_item_po ?? '-'}</div>
-                    <div className="text-xs text-gray-400">PO Date</div>
+                    <div className="text-xs text-gray-400">PO Terakhir</div>
                     <div className="text-xs text-gray-300 mt-0.5 truncate">{formatDateOnly(p.po_date)}</div>
                     <div className="text-xs text-gray-300 mt-0.5">{p.percentage_item_po ?? '0'}%</div>
-                    {p.no_po ? (
+                    {p.project_code ? (
                       <button
                         type="button"
-                        onClick={() => togglePODetails(p.no_po)}
-                        aria-label={expandedPOs[p.no_po] ? 'Tutup detail material' : 'Buka detail material'}
+                        onClick={() => togglePODetails(p.project_code)}
+                        aria-label={expandedPOs[p.project_code] ? 'Tutup detail material' : 'Buka detail material'}
                         className="self-end mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-cyan-500 hover:bg-gray-800 hover:text-cyan-400"
                       >
-                        {expandedPOs[p.no_po] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {expandedPOs[p.project_code] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
                     ) : null}
                   </div>
                 </div>
-                {expandedPOs[p.no_po] ? (
+                {expandedPOs[p.project_code] ? (
                   <div className="mt-3 bg-slate-950/90 border border-slate-700 rounded-xl p-3 text-xs text-gray-300">
-                    {poDetailLoading[p.no_po] ? (
+                    {poDetailLoading[p.project_code] ? (
                       <div className="text-gray-400">Memuat detail material...</div>
-                    ) : poDetailError[p.no_po] ? (
-                      <div className="text-rose-400">{poDetailError[p.no_po]}</div>
-                    ) : Array.isArray(poDetailsByPo[p.no_po]) && poDetailsByPo[p.no_po].length > 0 ? (
+                    ) : poDetailError[p.project_code] ? (
+                      <div className="text-rose-400">{poDetailError[p.project_code]}</div>
+                    ) : Array.isArray(poDetailsByPo[p.project_code]) && poDetailsByPo[p.project_code].length > 0 ? (
                       <div className="space-y-2">
-                        {poDetailsByPo[p.no_po].map((item) => (
-                          <div key={`${p.no_po}-${item.no_item_po}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
+                        {poDetailsByPo[p.project_code].map((item) => (
+                          <div key={`${p.project_code}-${item.no_item_po}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
                             <div className="min-w-0">
+                               <div className="text-[11px] text-gray-300 mt-1">{item.komat}</div>
                               <div className="text-xs font-semibold text-white break-words" title={item.material_name}>{item.material_name}</div>
                               {renderMaterialQuantities(item)}
+                              <div className="text-[11px] text-gray-300 mt-1">No PO: {item.no_po}</div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered))}
+                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered, item.qty_arrived))}
                             </div>
                           </div>
                         ))}
@@ -291,49 +299,48 @@ export default function PengadaanKanbanSection({
 
         <KanbanColumn title="GR (Kedatangan)" badgeBg="bg-emerald-400" count={grList.length}>
           {grList.length > 0 ? grList.map((p, idx) => (
-            <Card key={`gr-${p.no_po}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-emerald-500 transition-colors">
+            <Card key={`gr-${p.project_code}-${idx}`} className="bg-slate-900 border border-slate-700 hover:border-emerald-500 transition-colors">
               <CardContent className="relative px-3 py-0.5">
                 <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                   <div className="space-y-0.5 min-w-0 leading-tight">
-                    <div className="text-sm font-semibold text-white truncate">{p.project_code ?? p.no_po}</div>
-                    <div className="text-xs text-gray-300 truncate">No: {p.no_po}</div>
-                    <div className="text-xs text-gray-300 truncate">{p.wbs ?? '-'}</div>
-                    <div className="text-xs text-gray-400 truncate">{p.vendor_name ?? '-'}</div>
-                    <Badge className={`${getAvgLeadTimePrBadgeClass(p.avg_lead_time_po ?? p.avg_lead_time)}`}>Lead Time: {formatAvgLeadTimePr(p.avg_lead_time_po ?? p.avg_lead_time)} Hari</Badge>
+                    <div className="text-sm font-semibold text-white truncate">{p.project_code}</div>
+                    <div className="text-xs text-gray-300 truncate">WBS: {p.wbs ?? '-'}</div>
+                    <div className="text-xs text-gray-400 truncate">Arrival: {formatDateOnly(p.arrival_date)}</div>
+                    <Badge className={`${getAvgLeadTimePrBadgeClass(p.avg_lead_time_gr ?? p.avg_lead_time)}`}>Lead Time: {formatAvgLeadTimePr(p.avg_lead_time_gr ?? p.avg_lead_time)} Hari</Badge>
                   </div>
                   <div className="flex flex-col gap-0 text-right shrink-0 leading-tight">
-                    <div className="text-xs font-semibold text-white">{p.item_po_diproses ?? 0} / {p.total_item_po ?? '-'}</div>
-                    <div className="text-xs text-gray-400">Arrival</div>
-                    <div className="text-xs text-gray-300 mt-0.5 truncate">{formatDateOnly(p.arrival_date)}</div>
-                    <div className="text-xs text-gray-300 mt-0.5">{p.percentage_item_po ?? '100'}%</div>
-                    {p.no_po ? (
+                    <div className="text-xs font-semibold text-white">{p.item_gr_diproses ?? 0} / {p.total_item_gr ?? '-'}</div>
+                    <div className="text-xs text-gray-300 mt-0.5">Selesai</div>
+                    <div className="text-xs text-gray-300 mt-0.5">{p.percentage_item_gr ?? '100'}%</div>
+                    {p.project_code ? (
                       <button
                         type="button"
-                        onClick={() => togglePODetails(p.no_po)}
-                        aria-label={expandedPOs[p.no_po] ? 'Tutup detail material' : 'Buka detail material'}
+                        onClick={() => toggleGRDetails(p.project_code)}
+                        aria-label={expandedGRs[p.project_code] ? 'Tutup detail material' : 'Buka detail material'}
                         className="self-end mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-cyan-500 hover:bg-gray-800 hover:text-cyan-400"
                       >
-                        {expandedPOs[p.no_po] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {expandedGRs[p.project_code] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
                     ) : null}
                   </div>
                 </div>
-                {expandedPOs[p.no_po] ? (
+                {expandedGRs[p.project_code] ? (
                   <div className="mt-3 bg-slate-950/90 border border-slate-700 rounded-xl p-3 text-xs text-gray-300">
-                    {poDetailLoading[p.no_po] ? (
+                    {grDetailLoading[p.project_code] ? (
                       <div className="text-gray-400">Memuat detail material...</div>
-                    ) : poDetailError[p.no_po] ? (
-                      <div className="text-rose-400">{poDetailError[p.no_po]}</div>
-                    ) : Array.isArray(poDetailsByPo[p.no_po]) && poDetailsByPo[p.no_po].length > 0 ? (
+                    ) : grDetailError[p.project_code] ? (
+                      <div className="text-rose-400">{grDetailError[p.project_code]}</div>
+                    ) : Array.isArray(grDetailsByProject[p.project_code]) && grDetailsByProject[p.project_code].length > 0 ? (
                       <div className="space-y-2">
-                        {poDetailsByPo[p.no_po].map((item) => (
-                          <div key={`${p.no_po}-${item.no_item_po}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
+                        {grDetailsByProject[p.project_code].map((item) => (
+                          <div key={`${p.project_code}-${item.no_item_po}`} className="grid grid-cols-[1fr_auto] gap-2 items-start border-b border-slate-800 pb-2 last:border-b-0 last:pb-0">
                             <div className="min-w-0">
+                              <div className="text-[11px] text-gray-300 mt-1">{item.komat}</div>
                               <div className="text-xs font-semibold text-white break-words" title={item.material_name}>{item.material_name}</div>
                               {renderMaterialQuantities(item)}
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered))}
+                              {renderStatusBadge(getEffectiveStatus(item.status, item.qty_requested, item.qty_ordered, item.qty_arrived))}
                             </div>
                           </div>
                         ))}

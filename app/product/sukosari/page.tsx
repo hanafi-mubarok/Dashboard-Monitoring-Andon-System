@@ -74,21 +74,29 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
   }, [allData, selectedProject]);
 
   useEffect(() => {
-    if (selectedProject || projectOptions.length === 0 || allData.length === 0) return;
+    // Only skip if a project is already selected or there are no project options yet
+    if (selectedProject) return;
+    if (projectOptions.length === 0) return;
 
-    const latestRow = allData.reduce<
-      ProductPercentageSukosari | undefined
-    >((latest, item) => {
-      if (!item.start_actual) return latest;
-      if (!latest || !latest.start_actual) return item;
-      return new Date(item.start_actual) > new Date(latest.start_actual) ? item : latest;
-    }, undefined);
+    // If we have local data, prefer the project from the most recent start_actual
+    if (allData.length > 0) {
+      const latestRow = allData.reduce<
+        ProductPercentageSukosari | undefined
+      >((latest, item) => {
+        if (!item.start_actual) return latest;
+        if (!latest || !latest.start_actual) return item;
+        return new Date(item.start_actual) > new Date(latest.start_actual) ? item : latest;
+      }, undefined);
 
-    if (latestRow?.project && projectOptions.includes(String(latestRow.project))) {
-      setSelectedProject(String(latestRow.project));
-    } else {
-      setSelectedProject(projectOptions[0] || '');
+      if (latestRow?.project && projectOptions.includes(String(latestRow.project))) {
+        setSelectedProject(String(latestRow.project));
+        return;
+      }
     }
+
+    // Fallback: pick the first available project option (server-provided),
+    // other effects will fetch the latest trainset for the selected project.
+    setSelectedProject(projectOptions[0] || '');
   }, [allData, projectOptions, selectedProject]);
 
   // Set default trainset only when project changes (do not depend on selectedTrainset to avoid reset on user selection)
@@ -132,7 +140,7 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
     const fetchAllData = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/product/percentage-sukosari');
+        const res = await fetch('/api/product/percentage-sukosari?workshop=Sukosari');
         if (!res.ok) throw new Error('fetch failed');
         const json = await res.json();
         if (!mounted) return;
@@ -159,7 +167,8 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
     let mounted = true;
     const fetchProjectOptions = async () => {
       try {
-        const res = await fetch('/api/product/project-options-sukosari');
+        if (mounted) setLoading(true);
+        const res = await fetch('/api/product/project-options-sukosari?workshop=Sukosari');
         if (!res.ok) throw new Error('fetch failed');
         const json = await res.json();
         if (!mounted) return;
@@ -175,6 +184,8 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
         console.error('Gagal memuat pilihan project:', e);
         const derived = Array.from(new Set(allData.map((d) => String(d.project || '').trim()).filter(Boolean)));
         setProjectOptions(derived);
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
 
@@ -193,6 +204,8 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
         if (selectedProject) params.set('project_name', selectedProject);
         if (selectedTrainset) params.set('trainset', selectedTrainset);
 
+        // ensure we always request data for the Sukosari workshop
+        params.set('workshop', 'Sukosari');
         const res = await fetch(`/api/product/percentage-sukosari?${params.toString()}`);
         if (!res.ok) throw new Error('fetch failed');
         const json = await res.json();
@@ -214,17 +227,19 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
 
   // When project changes, try server-side latest trainset (protrack), fallback to client-side
   useEffect(() => {
+    let mounted = true;
     const fetchLatest = async () => {
       if (!selectedProject) {
         setSelectedTrainset('');
         return;
       }
+      if (mounted) setLoading(true);
       try {
         const res = await fetch(`/api/product/latest-trainset?project=${encodeURIComponent(selectedProject)}&line=null&workshop=Sukosari`);
         if (res.ok) {
           const json = await res.json();
           if (json?.trainset) {
-            setSelectedTrainset(String(json.trainset));
+            if (mounted) setSelectedTrainset(String(json.trainset));
             return;
           }
         }
@@ -243,19 +258,22 @@ export default function WorkshopSukosariPage({ data: initialData, initialTrainse
         }, projectRows[0]);
 
         if (latestRow?.trainset) {
-          setSelectedTrainset(String(latestRow.trainset));
+          if (mounted) setSelectedTrainset(String(latestRow.trainset));
           return;
         }
       }
 
       if (trainsetOptions.length > 0) {
-        setSelectedTrainset(trainsetOptions[0]);
+        if (mounted) setSelectedTrainset(trainsetOptions[0]);
       } else {
-        setSelectedTrainset('');
+        if (mounted) setSelectedTrainset('');
       }
+
+      if (mounted) setLoading(false);
     };
 
     fetchLatest();
+    return () => { mounted = false; };
   }, [selectedProject, allData, trainsetOptions]);
 
   const effectiveTrainset = selectedTrainset || '';

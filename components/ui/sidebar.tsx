@@ -238,8 +238,8 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
     if (pathname.startsWith('/andon-monitoring')) return 'andon-monitoring';
     if (pathname.startsWith('/material/monitoring-kpm')) return 'material-monitoring-kpm';
     if (pathname.startsWith('/material/potensi-kekurangan')) return 'material-potensi-kekurangan';
+    if (pathname.startsWith('/material/plotting-material')) return 'material-plotting';
     if (pathname.startsWith('/material/pengadaan')) return 'material-pengadaan';
-    if (pathname.startsWith('/material/material-tracking')) return 'material-tracking';
     if (pathname.startsWith('/material')) return 'material-cetak-kpm-lantai3';
     if (pathname === '/operator' || pathname.startsWith('/operator/')) return 'operator-profile';
     if (pathname.startsWith('/penugasan-operator')) return 'operator-assignment';
@@ -305,7 +305,7 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
         },
         {
           id: 'material-cetak-kpm-lantai3',
-          label: 'Cetak KPM Lantai 3',
+          label: 'Cetak KPM',
           path: '/material'
         },
         {
@@ -314,10 +314,17 @@ const ModernSidebar = ({ children }: ModernSidebarProps) => {
           path: '/material/monitoring-kpm'
         },
         {
+          id: 'material-plotting',
+          label: 'Plotting Material',
+          path: '/material/plotting-material'
+        },
+        /*
+        {
           id: 'material-potensi-kekurangan',
           label: 'Potensi Kekurangan Material',
           path: '/material/potensi-kekurangan'
         }
+          */
         /*
         {
           id: 'material-tracking',
