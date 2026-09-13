@@ -1,5 +1,7 @@
 "use client";
 
+import { Check } from "lucide-react";
+
 export const FUNNEL_MAX_WIDTH = 300;
 export const H = { pr: 108, po: 108, arrival: 130 };
 export const TOTAL_HEIGHT = H.pr + H.po + H.arrival;
@@ -74,15 +76,15 @@ export function renderStatusBadge(status) {
   } else if (normalized.includes("reservasi")) {
     colorClass = "bg-gray-500 text-white";
     label = "RES";
-  } else if (normalized.includes("pr")) {
-    colorClass = "bg-red-500 text-white";
-    label = "PR";   
-  } else if (normalized.includes("po")) {
+  } else if (/\b(proses\s*po|po)\b/.test(normalized)) {
     colorClass = "bg-amber-400 text-black";
     label = "PO";
+  } else if (/\b(proses\s*pr|pr)\b/.test(normalized)) {
+    colorClass = "bg-red-500 text-white";
+    label = "PR";
   } else if (normalized.includes("diterima") || /\bgr\b/.test(normalized)) {
     colorClass = "bg-emerald-500 text-white";
-    label = "GR";
+    label = <Check className="h-4 w-4" strokeWidth={3} />;
 
   }
 
